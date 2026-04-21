@@ -1,0 +1,45 @@
+{
+    "compilerOptions": {
+        /* Language & Environment */
+        "target": "ES2021",
+        "lib": [
+            "ES2021"
+        ],
+        "module": "CommonJS",
+        "moduleResolution": "node",
+        /* Paths */
+        "rootDir": "./src",
+        "outDir": "./dist",
+        "baseUrl": "./",
+        "paths": {
+            "@/*": [
+                "src/*"
+            ]
+        },
+        /* Interop (fixes your bcrypt/crypto issue) */
+        "esModuleInterop": true,
+        "allowSyntheticDefaultImports": true,
+        /* Strictness (important for production) */
+        "strict": true,
+        "noImplicitAny": true,
+        "strictNullChecks": true,
+        /* Code Quality */
+        "skipLibCheck": true,
+        "forceConsistentCasingInFileNames": true,
+        /* Source Maps */
+        "sourceMap": true,
+        /* Emit */
+        "resolveJsonModule": true,
+        "isolatedModules": true,
+        /* Experimental (optional but useful) */
+        "experimentalDecorators": true,
+        "emitDecoratorMetadata": true
+    },
+    "include": [
+        "src"
+    ],
+    "exclude": [
+        "node_modules",
+        "dist"
+    ]
+}
