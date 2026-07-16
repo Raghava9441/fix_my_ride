@@ -1,6 +1,7 @@
 
 
 import mongoose, { Schema } from "mongoose";
+import { tenantPlugin } from '../middleware/tenant/tenantPlugin';
 
 
 const permissionSchema = new Schema({
@@ -132,5 +133,7 @@ permissionSchema.statics.seedDefaults = async function () {
         );
     }
 };
+
+permissionSchema.plugin(tenantPlugin);
 
 export const Permission = mongoose.model('Permission', permissionSchema);

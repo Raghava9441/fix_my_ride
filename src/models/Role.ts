@@ -1,4 +1,5 @@
 import mongoose, { Schema } from "mongoose";
+import { tenantPlugin } from '../middleware/tenant/tenantPlugin';
 
 const roleSchema = new Schema({
   // Identity
@@ -240,5 +241,7 @@ roleSchema.statics.findForServiceCenter = function(centerId) {
     isActive: true
   }).populate('permissions');
 };
+
+roleSchema.plugin(tenantPlugin);
 
 export const Role = mongoose.model('Role', roleSchema);

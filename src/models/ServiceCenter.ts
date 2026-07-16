@@ -1,6 +1,7 @@
 // models/ServiceCenter.js
 
 import mongoose, { Schema } from "mongoose";
+import { tenantPlugin } from '../middleware/tenant/tenantPlugin';
 
 const serviceCenterSchema = new Schema({
   // Multi-tenant
@@ -126,5 +127,7 @@ serviceCenterSchema.virtual('vehicles', {
   localField: '_id',
   foreignField: 'authorizedServiceCenters.serviceCenterId'
 });
+
+serviceCenterSchema.plugin(tenantPlugin);
 
 export const ServiceCenter = mongoose.model('ServiceCenter', serviceCenterSchema);

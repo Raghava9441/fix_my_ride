@@ -1,5 +1,6 @@
 // models/SubscriptionPlan.ts
 import mongoose, { Schema, Document } from 'mongoose';
+import { tenantPlugin } from '../middleware/tenant/tenantPlugin';
 
 export interface ISubscriptionPlan extends Document {
   name: string;
@@ -264,5 +265,7 @@ subscriptionPlanSchema.statics.seedDefaults = async function() {
     );
   }
 };
+
+subscriptionPlanSchema.plugin(tenantPlugin);
 
 export const SubscriptionPlan = mongoose.model<ISubscriptionPlan>('SubscriptionPlan', subscriptionPlanSchema);

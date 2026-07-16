@@ -1,5 +1,6 @@
 // server/models/Notification.js
 import mongoose from 'mongoose';
+import { tenantPlugin } from '../middleware/tenant/tenantPlugin';
 
 const notificationSchema = new mongoose.Schema({
     // Recipient Information
@@ -473,6 +474,8 @@ notificationSchema.pre(/^find/, function () {
 
 // TTL index for auto-deletion after expiry (MongoDB will delete these)
 notificationSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
+
+notificationSchema.plugin(tenantPlugin);
 
 const Notification = mongoose.model('Notification', notificationSchema);
 module.exports = Notification;

@@ -1,5 +1,6 @@
 // models/Document.ts
 import mongoose, { Schema } from 'mongoose';
+import { tenantPlugin } from '../middleware/tenant/tenantPlugin';
 
 export interface IDocument extends mongoose.Document {
   tenantId?: mongoose.Types.ObjectId;
@@ -269,5 +270,7 @@ documentSchema.statics.findExpiringSoon = function(days = 30) {
     status: 'active'
   }).populate('entityId');
 };
+
+documentSchema.plugin(tenantPlugin);
 
 export const Document = mongoose.model<IDocument>('Document', documentSchema);

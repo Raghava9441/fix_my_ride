@@ -1,5 +1,6 @@
 // models/Invitation.ts
 import mongoose, { Schema, Document } from 'mongoose';
+import { tenantPlugin } from '../middleware/tenant/tenantPlugin';
 import crypto from 'crypto';
 
 export interface IInvitation extends Document {
@@ -352,5 +353,7 @@ invitationSchema.statics.createVehicleAccess = async function(data: {
     createdBy: data.inviterId
   });
 };
+
+invitationSchema.plugin(tenantPlugin);
 
 export const Invitation = mongoose.model<IInvitation>('Invitation', invitationSchema);

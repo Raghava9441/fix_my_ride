@@ -14,8 +14,12 @@ interface TokenPayload {
   email?: string;
   role?: string;
   tenantId?: string;
+  jti?: string;
   [key: string]: unknown;
 }
+
+const DEFAULT_ISSUER = "fix-my-ride";
+const DEFAULT_AUDIENCE = "fix-my-ride-clients";
 
 /**
  * Generate JWT token
@@ -33,8 +37,8 @@ export function generateToken(
   const {
     expiresIn = DEFAULT_EXPIRY,
     algorithm = DEFAULT_ALGORITHM,
-    issuer,
-    audience,
+    issuer = DEFAULT_ISSUER,
+    audience = DEFAULT_AUDIENCE,
   } = options;
 
   return jwt.sign(payload, secret, {
@@ -42,7 +46,7 @@ export function generateToken(
     algorithm,
     issuer,
     audience,
-  });
+  } as jwt.SignOptions);
 }
 
 /**
@@ -59,11 +63,12 @@ export function verifyToken<T extends TokenPayload = TokenPayload>(
 ): T | null {
   try {
     const algorithms = options.algorithms || [DEFAULT_ALGORITHM];
-    return jwt.verify(token, secret, {
-      algorithms,
-      issuer: options.issuer,
-      audience: options.audience,
-    }) as T;
+    const verified = jwt.verify(token, secret, {
+      algorithms: algorithms as jwt.Algorithm[],
+      issuer: options.issuer || DEFAULT_ISSUER,
+      audience: options.audience || DEFAULT_AUDIENCE,
+    } as jwt.VerifyOptions);
+    return verified as unknown as T;
   } catch {
     return null;
   }
@@ -77,7 +82,7 @@ export function decodeToken<T extends TokenPayload = TokenPayload>(
 ): T | null {
   try {
     const decoded = jwt.decode(token);
-    return decoded as T;
+    return decoded as unknown as T;
   } catch {
     return null;
   }
@@ -160,7 +165,7 @@ export function verifyHmac(
 export function getTokenExpiry(token: string): Date | null {
   const decoded = decodeToken(token);
   if (!decoded?.exp) return null;
-  return new Date(decoded.exp * 1000);
+  return new Date(Number(decoded.exp) * 1000);
 }
 
 /**
@@ -200,21 +205,51 @@ export function refreshToken(
 }
 
 /**
- * Invalidate token (add to blacklist - requires Redis/DB)
- * Note: This is a placeholder - actual implementation requires storage
+ * Invalidate a token by adding its jti to a Redis denylist.
+ * The denylist entry TTL equals the token's remaining lifetime so it
+ * auto-expires. Requires the token to carry a `jti` claim and `exp`.
  */
-export function invalidateToken(token: string): Promise<boolean> {
-  // In production, store token in Redis/session store with TTL
-  console.warn("invalidateToken is a placeholder - implement with Redis/DB");
-  return Promise.resolve(true);
+export async function invalidateToken(
+  token: string,
+  opts: {
+    getRedis: () => any;
+    prefix?: string;
+  },
+): Promise<boolean> {
+  try {
+    const decoded = decodeToken(token);
+    const jti = (decoded as any)?.jti;
+    const exp = (decoded as any)?.exp;
+    if (!jti || !exp) return false;
+
+    const redis = opts.getRedis();
+    const prefix = opts.prefix ?? "auth:revoked:";
+    const ttlSeconds = Math.max(1, Math.floor(exp - Date.now() / 1000));
+    await redis.set(`${prefix}${jti}`, "1", "EX", ttlSeconds);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /**
- * Check if token is blacklisted
- * Note: This is a placeholder - actual implementation requires storage
+ * Check whether a token's jti has been revoked via the Redis denylist.
  */
-export function isTokenBlacklisted(token: string): Promise<boolean> {
-  // In production, check Redis/session store
-  console.warn("isTokenBlacklisted is a placeholder - implement with Redis/DB");
-  return Promise.resolve(false);
+export async function isTokenBlacklisted(
+  token: string,
+  opts: {
+    getRedis: () => any;
+    prefix?: string;
+  },
+): Promise<boolean> {
+  try {
+    const jti = (decodeToken(token) as any)?.jti;
+    if (!jti) return false;
+    const redis = opts.getRedis();
+    const prefix = opts.prefix ?? "auth:revoked:";
+    const result = await redis.get(`${prefix}${jti}`);
+    return result != null;
+  } catch {
+    return false;
+  }
 }

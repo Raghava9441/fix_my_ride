@@ -1,5 +1,6 @@
 // models/OdometerReading.ts
 import mongoose, { Schema, Document } from 'mongoose';
+import { tenantPlugin } from '../middleware/tenant/tenantPlugin';
 
 export interface IOdometerReading extends Document {
   tenantId?: mongoose.Types.ObjectId;
@@ -114,5 +115,7 @@ odometerReadingSchema.statics.getHistory = function(
     .sort({ recordedAt: -1 })
     .limit(options.limit || 100);
 };
+
+odometerReadingSchema.plugin(tenantPlugin);
 
 export const OdometerReading = mongoose.model<IOdometerReading>('OdometerReading', odometerReadingSchema);

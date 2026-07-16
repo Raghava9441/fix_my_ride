@@ -7,6 +7,8 @@ import {
   checkDatabaseHealth,
   setupGracefulShutdown,
 } from "./config/database";
+import { connectRedis, disconnectRedis } from "./config/redis";
+import { startWorkers, stopWorkers } from "./workers";
 import app from "./app";
 
 // Global variables
@@ -20,6 +22,21 @@ const startServer = async (): Promise<void> => {
   try {
     // Connect to database
     await connectDatabase();
+
+    // Connect to Redis (required for cache, sessions, queue)
+    try {
+      await connectRedis();
+    } catch (redisErr) {
+      logger.error("Redis connection failed:", redisErr);
+      // Continue booting; features needing Redis will fail closed.
+    }
+
+    // Start background workers (email, reports, etc.)
+    try {
+      startWorkers();
+    } catch (workerErr) {
+      logger.error("Failed to start workers:", workerErr);
+    }
 
     // Create HTTP server
     server = app.listen(config.port, config.host, () => {
@@ -67,6 +84,14 @@ const startServer = async (): Promise<void> => {
 
     // Setup graceful shutdown using database module
     setupGracefulShutdown(server);
+
+    // Stop background workers before shutting down DB/Redis.
+    const onShutdown = async () => {
+      await stopWorkers().catch(() => {});
+      await disconnectRedis().catch(() => {});
+    };
+    process.on("SIGTERM", () => void onShutdown());
+    process.on("SIGINT", () => void onShutdown());
   } catch (error) {
     logger.error("Failed to start server:", error);
     process.exit(1);

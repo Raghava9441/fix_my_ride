@@ -1,5 +1,6 @@
 // models/Payment.ts
 import mongoose, { Schema, Document } from 'mongoose';
+import { tenantPlugin } from '../middleware/tenant/tenantPlugin';
 
 export interface IPayment extends Document {
   accountId: mongoose.Types.ObjectId;
@@ -175,5 +176,7 @@ paymentSchema.index({ accountId: 1, createdAt: -1 });
 paymentSchema.index({ serviceCenterId: 1, status: 1 });
 paymentSchema.index({ providerPaymentId: 1 }, { sparse: true });
 paymentSchema.index({ status: 1, createdAt: -1 });
+
+paymentSchema.plugin(tenantPlugin);
 
 export const Payment = mongoose.model<IPayment>('Payment', paymentSchema);

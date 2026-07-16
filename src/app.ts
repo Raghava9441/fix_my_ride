@@ -17,8 +17,7 @@ import { corsOptions } from "./config/cors";
 import { rateLimitConfig } from "./config/rate-limit";
 
 // Import middleware
-import { errorHandler } from "./middleware/error.middleware";
-// import { notFound } from './middleware/error/notFound';
+import { errorHandler, notFound } from "./middleware/error.middleware";
 import { requestContext } from "./middleware/requestContext.middleware";
 import { tenantIsolation } from "./middleware/tenant.middleware";
 import { auditLogger } from "./middleware/audit.middleware";
@@ -36,6 +35,7 @@ import invitationRoutes from "./routes/invitation.routes";
 import reportRoutes from "./routes/report.routes";
 import publicRoutes from "./routes/public.routes";
 import accountRoutes from "./routes/account.routes";
+import healthRoutes from "./routes/health.routes";
 
 // Import services
 // import { healthCheckService } from './services/health/healthCheckService';
@@ -140,11 +140,8 @@ app.use("/api/v1/accounts/*/status", auditLogger);
 // API Routes
 // ========================================
 
-// Health check endpoints
-// app.get('/health', healthCheckService.simple);
-// app.get('/health/detailed', healthCheckService.detailed);
-// app.get('/ready', healthCheckService.readiness);
-// app.get('/live', healthCheckService.liveness);
+// Health check endpoints (public probes, intentionally unscoped)
+app.use(healthRoutes);
 
 // API version 1 routes
 app.use("/api/v1/auth", authRoutes);
@@ -175,7 +172,7 @@ app.use(
 // ========================================
 // 404 Handler
 // ========================================
-// app.use(notFound);
+app.use(notFound);
 
 // ========================================
 // Global Error Handler

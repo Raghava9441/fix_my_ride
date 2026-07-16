@@ -4,6 +4,7 @@
 
 export * from "./asyncHandler";
 export * from "./apiResponse";
+export * from "./appError";
 export * from "./validators";
 export * from "./number";
 export * from "./string";
@@ -25,6 +26,12 @@ export {
   createPaginatedResponse,
   createValidationError,
 } from "./apiResponse";
+
+export {
+  AppError,
+  createAppError,
+  toFieldErrors,
+} from "./appError";
 
 export {
   validateEmail,

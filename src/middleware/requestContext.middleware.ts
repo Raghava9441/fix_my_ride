@@ -62,9 +62,20 @@ export const requestContext = (req: Request, res: Response, next: NextFunction):
     req.tenantId = tenantId;
     req.context.set('tenantId', tenantId);
   }
+
+  // Reflect authenticated user roles into context for tenant scoping.
+  if ((req as any).user) {
+    const roles = (req as any).user.roles ?? [(req as any).user.role];
+    req.context.set('userRoles', roles);
+    if ((req as any).user.tenantId) {
+      req.tenantId = (req as any).user.tenantId;
+      req.context.set('tenantId', (req as any).user.tenantId);
+    }
+  }
   
   // Add response headers
   res.setHeader('X-Request-ID', req.id);
+  res.setHeader('X-Correlation-ID', req.id);
   if (tenantId) {
     res.setHeader('X-Tenant-ID', tenantId);
   }

@@ -5,6 +5,8 @@
  * All responses follow this format for consistency
  */
 
+import { PaginationMeta, calculatePagination } from "./pagination";
+
 // Base Types and Interfaces
 
 export interface ApiResponseMetadata {
@@ -18,21 +20,6 @@ export interface ApiResponseMetadata {
     version?: string;
     /** Additional custom metadata */
     [key: string]: any;
-}
-
-export interface PaginationMeta {
-    /** Current page number (1-indexed) */
-    page: number;
-    /** Items per page */
-    limit: number;
-    /** Total number of items */
-    total: number;
-    /** Total number of pages */
-    totalPages: number;
-    /** Whether there is a next page */
-    hasNext: boolean;
-    /** Whether there is a previous page */
-    hasPrevious: boolean;
 }
 
 export interface ValidationErrorDetail {
@@ -285,14 +272,7 @@ export class ResponseBuilder<T = any> {
      * Add pagination metadata
      */
     public withPagination(page: number, limit: number, total: number): this {
-        this.meta.pagination = {
-            page,
-            limit,
-            total,
-            totalPages: Math.ceil(total / limit),
-            hasNext: page < Math.ceil(total / limit),
-            hasPrevious: page > 1
-        };
+        this.meta.pagination = calculatePagination({ page, limit, total });
         return this;
     }
 
@@ -537,14 +517,7 @@ export function createPaginatedResponse<T>(
     message: string = 'Data retrieved successfully'
 ): ApiResponse<T[]> {
     const meta: ApiResponseMetadata = {
-        pagination: {
-            page,
-            limit,
-            total,
-            totalPages: Math.ceil(total / limit),
-            hasNext: page < Math.ceil(total / limit),
-            hasPrevious: page > 1
-        }
+        pagination: calculatePagination({ page, limit, total })
     };
 
     return new ApiResponse<T[]>(true, HttpStatus.OK, message, data, meta);

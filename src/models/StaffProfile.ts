@@ -1,5 +1,6 @@
 // models/StaffProfile.js
 import mongoose, { Schema } from "mongoose";
+import { tenantPlugin } from '../middleware/tenant/tenantPlugin';
 
 const staffProfileSchema = new Schema({
   // Link to Account
@@ -241,5 +242,7 @@ staffProfileSchema.statics.findByServiceCenter = function(centerId, options = {}
     .populate('roleId', 'name slug level')
     .sort(options.sort || { joinedAt: -1 });
 };
+
+staffProfileSchema.plugin(tenantPlugin);
 
 export const StaffProfile = mongoose.model('StaffProfile', staffProfileSchema);

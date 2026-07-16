@@ -2,6 +2,7 @@
 import mongoose, { Schema, Document } from 'mongoose';
 import bcrypt from 'bcryptjs';
 import crypto from 'node:crypto';    
+import { tenantPlugin } from '../middleware/tenant/tenantPlugin';
 
 export interface IAccount extends Document {
   email: string;
@@ -354,5 +355,7 @@ accountSchema.statics.findActive = function(filter = {}) {
     ]
   });
 };
+
+accountSchema.plugin(tenantPlugin);
 
 export const Account = mongoose.model<IAccount>('Account', accountSchema);

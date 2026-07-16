@@ -1,331 +1,227 @@
 import { Router, Request, Response, NextFunction } from "express";
 import { asyncHandler, createSuccessResponse, HttpStatus } from "../utils";
+import { authenticate } from "../middleware/auth.middleware";
+import authService, { NotifyFn } from "../services/auth.service";
+import { AppError } from "../utils/appError";
+import { ERROR_CODES } from "../constants/errors";
+import { enqueue } from "../services/queue.service";
+import { EMAIL_QUEUE } from "../workers";
 
 const router = Router();
 
-const authController = {
-  register: asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => {
-      const result = {
-        id: "dummy-user-id",
-        email: req.body.email || "user@example.com",
-      };
-      const response = createSuccessResponse(
-        result,
-        "User registered successfully",
-        HttpStatus.CREATED,
-      );
-      res.status(response.statusCode).json(response.toJSON());
-    },
-  ),
-
-  login: asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => {
-      const result = {
-        user: {
-          id: "dummy-user-id",
-          email: req.body.email || "user@example.com",
-        },
-        accessToken: "dummy-access-token",
-        refreshToken: "dummy-refresh-token",
-      };
-      const response = createSuccessResponse(
-        result,
-        "Login successful",
-        HttpStatus.OK,
-      );
-      res.status(response.statusCode).json(response.toJSON());
-    },
-  ),
-
-  logout: asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => {
-      const response = createSuccessResponse(
-        null,
-        "Logout successful",
-        HttpStatus.OK,
-      );
-      res.status(response.statusCode).json(response.toJSON());
-    },
-  ),
-
-  refreshToken: asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => {
-      const result = {
-        accessToken: "new-dummy-access-token",
-        refreshToken: "new-dummy-refresh-token",
-      };
-      const response = createSuccessResponse(
-        result,
-        "Token refreshed successfully",
-        HttpStatus.OK,
-      );
-      res.status(response.statusCode).json(response.toJSON());
-    },
-  ),
-
-  forgotPassword: asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => {
-      const response = createSuccessResponse(
-        null,
-        "Password reset email sent",
-        HttpStatus.OK,
-      );
-      res.status(response.statusCode).json(response.toJSON());
-    },
-  ),
-
-  resetPassword: asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => {
-      const response = createSuccessResponse(
-        null,
-        "Password reset successful",
-        HttpStatus.OK,
-      );
-      res.status(response.statusCode).json(response.toJSON());
-    },
-  ),
-
-  changePassword: asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => {
-      const response = createSuccessResponse(
-        null,
-        "Password changed successfully",
-        HttpStatus.OK,
-      );
-      res.status(response.statusCode).json(response.toJSON());
-    },
-  ),
-
-  verifyEmail: asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => {
-      const result = { verified: true };
-      const response = createSuccessResponse(
-        result,
-        "Email verified successfully",
-        HttpStatus.OK,
-      );
-      res.status(response.statusCode).json(response.toJSON());
-    },
-  ),
-
-  resendVerification: asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => {
-      const response = createSuccessResponse(
-        null,
-        "Verification email sent",
-        HttpStatus.OK,
-      );
-      res.status(response.statusCode).json(response.toJSON());
-    },
-  ),
-
-  getMe: asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => {
-      const result = {
-        id: "dummy-user-id",
-        email: "user@example.com",
-        name: "John Doe",
-        role: "owner",
-      };
-      const response = createSuccessResponse(
-        result,
-        "User retrieved successfully",
-        HttpStatus.OK,
-      );
-      res.status(response.statusCode).json(response.toJSON());
-    },
-  ),
-
-  updateMe: asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => {
-      const result = {
-        id: "dummy-user-id",
-        ...req.body,
-      };
-      const response = createSuccessResponse(
-        result,
-        "Profile updated successfully",
-        HttpStatus.OK,
-      );
-      res.status(response.statusCode).json(response.toJSON());
-    },
-  ),
-
-  googleAuth: asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => {
-      const response = createSuccessResponse(
-        { url: "/auth/google/callback" },
-        "Redirecting to Google",
-        HttpStatus.OK,
-      );
-      res.status(response.statusCode).json(response.toJSON());
-    },
-  ),
-
-  googleCallback: asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => {
-      const result = {
-        accessToken: "dummy-google-token",
-        refreshToken: "dummy-google-refresh",
-      };
-      const response = createSuccessResponse(
-        result,
-        "Google login successful",
-        HttpStatus.OK,
-      );
-      res.status(response.statusCode).json(response.toJSON());
-    },
-  ),
-
-  facebookAuth: asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => {
-      const response = createSuccessResponse(
-        { url: "/auth/facebook/callback" },
-        "Redirecting to Facebook",
-        HttpStatus.OK,
-      );
-      res.status(response.statusCode).json(response.toJSON());
-    },
-  ),
-
-  facebookCallback: asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => {
-      const result = {
-        accessToken: "dummy-facebook-token",
-        refreshToken: "dummy-facebook-refresh",
-      };
-      const response = createSuccessResponse(
-        result,
-        "Facebook login successful",
-        HttpStatus.OK,
-      );
-      res.status(response.statusCode).json(response.toJSON());
-    },
-  ),
-
-  appleAuth: asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => {
-      const response = createSuccessResponse(
-        { url: "/auth/apple/callback" },
-        "Redirecting to Apple",
-        HttpStatus.OK,
-      );
-      res.status(response.statusCode).json(response.toJSON());
-    },
-  ),
-
-  appleCallback: asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => {
-      const result = {
-        accessToken: "dummy-apple-token",
-        refreshToken: "dummy-apple-refresh",
-      };
-      const response = createSuccessResponse(
-        result,
-        "Apple login successful",
-        HttpStatus.OK,
-      );
-      res.status(response.statusCode).json(response.toJSON());
-    },
-  ),
-
-  setupMFA: asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => {
-      const result = {
-        secret: "dummy-mfa-secret",
-        qrCode: "data:image/png;base64,dummy",
-      };
-      const response = createSuccessResponse(
-        result,
-        "MFA setup initialized",
-        HttpStatus.OK,
-      );
-      res.status(response.statusCode).json(response.toJSON());
-    },
-  ),
-
-  verifyMFA: asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => {
-      const result = { verified: true };
-      const response = createSuccessResponse(
-        result,
-        "MFA code verified",
-        HttpStatus.OK,
-      );
-      res.status(response.statusCode).json(response.toJSON());
-    },
-  ),
-
-  enableMFA: asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => {
-      const response = createSuccessResponse(
-        null,
-        "MFA enabled successfully",
-        HttpStatus.OK,
-      );
-      res.status(response.statusCode).json(response.toJSON());
-    },
-  ),
-
-  disableMFA: asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => {
-      const response = createSuccessResponse(
-        null,
-        "MFA disabled successfully",
-        HttpStatus.OK,
-      );
-      res.status(response.statusCode).json(response.toJSON());
-    },
-  ),
-
-  generateBackupCodes: asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => {
-      const result = {
-        backupCodes: [
-          "code1",
-          "code2",
-          "code3",
-          "code4",
-          "code5",
-          "code6",
-          "code7",
-          "code8",
-        ],
-      };
-      const response = createSuccessResponse(
-        result,
-        "Backup codes generated",
-        HttpStatus.OK,
-      );
-      res.status(response.statusCode).json(response.toJSON());
-    },
-  ),
+// Enqueue email notifications to the background worker queue.
+const notify: NotifyFn = (type, payload) => {
+  void enqueue(EMAIL_QUEUE, { type, data: payload }).catch((err) => {
+    // Logged; the request itself should not fail because of a notification.
+    console.error("Failed to enqueue notification:", err);
+  });
 };
 
-router.post("/register", authController.register);
-router.post("/login", authController.login);
-router.post("/logout", authController.logout);
-router.post("/refresh-token", authController.refreshToken);
-router.post("/forgot-password", authController.forgotPassword);
-router.post("/reset-password", authController.resetPassword);
-router.post("/change-password", authController.changePassword);
-router.get("/verify-email", authController.verifyEmail);
-router.post("/resend-verification", authController.resendVerification);
-router.get("/me", authController.getMe);
-router.put("/me", authController.updateMe);
+const getBearer = (req: Request): string | undefined =>
+  req.headers.authorization?.split(" ")[1];
 
-router.get("/google", authController.googleAuth);
-router.get("/google/callback", authController.googleCallback);
-router.get("/facebook", authController.facebookAuth);
-router.get("/facebook/callback", authController.facebookCallback);
-router.get("/apple", authController.appleAuth);
-router.post("/apple/callback", authController.appleCallback);
+// ─── Public routes ──────────────────────────────────────────────────────────
 
-router.post("/mfa/setup", authController.setupMFA);
-router.post("/mfa/verify", authController.verifyMFA);
-router.post("/mfa/enable", authController.enableMFA);
-router.post("/mfa/disable", authController.disableMFA);
-router.post("/mfa/backup-codes", authController.generateBackupCodes);
+router.post(
+  "/register",
+  asyncHandler(async (req: Request, res: Response) => {
+    const { account, tokens } = await authService.register({
+      email: req.body.email,
+      password: req.body.password,
+      firstName: req.body.firstName,
+      lastName: req.body.lastName,
+      tenantId: req.body.tenantId,
+      tenantSlug: req.body.tenantSlug,
+      ip: req.ip,
+      userAgent: req.get("user-agent"),
+      notify,
+    });
+    res
+      .status(HttpStatus.CREATED)
+      .json(
+        createSuccessResponse(
+          { id: account._id, email: account.email, ...tokens },
+          "User registered successfully",
+          HttpStatus.CREATED,
+        ),
+      );
+  }),
+);
+
+router.post(
+  "/login",
+  asyncHandler(async (req: Request, res: Response) => {
+    try {
+      const { account, tokens } = await authService.login({
+        email: req.body.email,
+        password: req.body.password,
+        ip: req.ip,
+        userAgent: req.get("user-agent"),
+        notify,
+      });
+      res
+        .status(HttpStatus.OK)
+        .json(
+          createSuccessResponse(
+            { user: { id: account._id, email: account.email, role: account.primaryRole }, ...tokens },
+            "Login successful",
+            HttpStatus.OK,
+          ),
+        );
+    } catch (err) {
+      // MFA_REQUIRED carries an mfaToken in details -> surface it
+      if (err instanceof AppError && err.code === ERROR_CODES.MFA_REQUIRED.code) {
+        return res.status(err.httpStatus).json({
+          success: false,
+          code: err.code,
+          key: err.key,
+          correlationId: err.correlationId,
+          message: err.message,
+          details: err.details,
+          timestamp: new Date().toISOString(),
+        });
+      }
+      throw err;
+    }
+  }),
+);
+
+router.post(
+  "/mfa/verify",
+  asyncHandler(async (req: Request, res: Response) => {
+    const { account, tokens } = await authService.verifyMfa({
+      mfaToken: req.body.mfaToken,
+      code: req.body.code,
+      notify,
+    });
+    res
+      .status(HttpStatus.OK)
+      .json(
+        createSuccessResponse(
+          { user: { id: account._id, email: account.email }, ...tokens },
+          "MFA verified, login successful",
+          HttpStatus.OK,
+        ),
+      );
+  }),
+);
+
+router.post(
+  "/refresh-token",
+  asyncHandler(async (req: Request, res: Response) => {
+    const tokens = await authService.refresh({ refreshToken: req.body.refreshToken });
+    res
+      .status(HttpStatus.OK)
+      .json(createSuccessResponse(tokens, "Token refreshed successfully", HttpStatus.OK));
+  }),
+);
+
+router.post(
+  "/logout",
+  asyncHandler(async (req: Request, res: Response) => {
+    await authService.logout({
+      accessToken: getBearer(req) ?? "",
+      refreshToken: req.body.refreshToken,
+    });
+    res.status(HttpStatus.OK).json(createSuccessResponse(null, "Logout successful", HttpStatus.OK));
+  }),
+);
+
+router.post(
+  "/forgot-password",
+  asyncHandler(async (req: Request, res: Response) => {
+    await authService.forgotPassword({ email: req.body.email, notify });
+    // Always success to avoid enumeration
+    res
+      .status(HttpStatus.OK)
+      .json(createSuccessResponse(null, "Password reset email sent", HttpStatus.OK));
+  }),
+);
+
+router.post(
+  "/reset-password",
+  asyncHandler(async (req: Request, res: Response) => {
+    await authService.resetPassword({ token: req.body.token, password: req.body.password });
+    res
+      .status(HttpStatus.OK)
+      .json(createSuccessResponse(null, "Password reset successful", HttpStatus.OK));
+  }),
+);
+
+router.get(
+  "/verify-email",
+  asyncHandler(async (req: Request, res: Response) => {
+    await authService.verifyEmail({ token: req.query.token as string });
+    res
+      .status(HttpStatus.OK)
+      .json(createSuccessResponse({ verified: true }, "Email verified successfully", HttpStatus.OK));
+  }),
+);
+
+router.post(
+  "/resend-verification",
+  asyncHandler(async (req: Request, res: Response) => {
+    await authService.resendVerification({ email: req.body.email, notify });
+    res
+      .status(HttpStatus.OK)
+      .json(createSuccessResponse(null, "Verification email sent", HttpStatus.OK));
+  }),
+);
+
+// ─── Protected routes ────────────────────────────────────────────────────────
+
+router.get("/me", authenticate, asyncHandler(async (req: Request, res: Response) => {
+  const account = await authService.getMe(req.user!.id);
+  res.status(HttpStatus.OK).json(createSuccessResponse(account, "User retrieved successfully", HttpStatus.OK));
+}));
+
+router.put("/me", authenticate, asyncHandler(async (req: Request, res: Response) => {
+  const account = await authService.updateMe(req.user!.id, req.body);
+  res.status(HttpStatus.OK).json(createSuccessResponse(account, "Profile updated successfully", HttpStatus.OK));
+}));
+
+router.post("/change-password", authenticate, asyncHandler(async (req: Request, res: Response) => {
+  await authService.changePassword({
+    userId: req.user!.id,
+    currentPassword: req.body.currentPassword,
+    newPassword: req.body.newPassword,
+  });
+  res.status(HttpStatus.OK).json(createSuccessResponse(null, "Password changed successfully", HttpStatus.OK));
+}));
+
+router.post("/mfa/setup", authenticate, asyncHandler(async (req: Request, res: Response) => {
+  const result = await authService.setupMfa(req.user!.id);
+  res.status(HttpStatus.OK).json(createSuccessResponse(result, "MFA setup initialized", HttpStatus.OK));
+}));
+
+router.post("/mfa/enable", authenticate, asyncHandler(async (req: Request, res: Response) => {
+  await authService.enableMfa({ userId: req.user!.id, code: req.body.code });
+  res.status(HttpStatus.OK).json(createSuccessResponse(null, "MFA enabled successfully", HttpStatus.OK));
+}));
+
+router.post("/mfa/disable", authenticate, asyncHandler(async (req: Request, res: Response) => {
+  await authService.disableMfa({ userId: req.user!.id, code: req.body.code });
+  res.status(HttpStatus.OK).json(createSuccessResponse(null, "MFA disabled successfully", HttpStatus.OK));
+}));
+
+router.post("/mfa/backup-codes", authenticate, asyncHandler(async (req: Request, res: Response) => {
+  const codes = await authService.generateBackupCodes(req.user!.id);
+  res.status(HttpStatus.OK).json(createSuccessResponse({ backupCodes: codes }, "Backup codes generated", HttpStatus.OK));
+}));
+
+// ─── OAuth (placeholder - requires provider config) ──────────────────────────
+
+const oauthNotImplemented = (_req: Request, res: Response) => {
+  res
+    .status(HttpStatus.NOT_IMPLEMENTED)
+    .json(createSuccessResponse(null, "OAuth provider not configured", HttpStatus.NOT_IMPLEMENTED));
+};
+
+router.get("/google", oauthNotImplemented);
+router.get("/google/callback", oauthNotImplemented);
+router.get("/facebook", oauthNotImplemented);
+router.get("/facebook/callback", oauthNotImplemented);
+router.get("/apple", oauthNotImplemented);
+router.post("/apple/callback", oauthNotImplemented);
 
 export default router;

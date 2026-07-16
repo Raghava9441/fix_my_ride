@@ -1,159 +1,103 @@
 // src/middleware/tenant/tenantIsolation.ts
-import { logger } from '../config/logger';
-import { Request, Response, NextFunction } from 'express';
-import mongoose from 'mongoose';
-import { AuthorizationError } from './error.middleware';
+import { Request, Response, NextFunction } from "express";
+import mongoose from "mongoose";
+import { logger } from "../config/logger";
+import { AppError } from "../utils/appError";
+import { ERROR_CODES } from "../constants/errors";
 
-// List of collections that are shared across tenants (no tenant isolation)
-const SHARED_COLLECTIONS = [
-  'vehicles',
-  'owners'
-];
+/**
+ * Resolves the active tenant for the current request and stores it in the
+ * request context (AsyncLocalStorage). The actual isolation is enforced at the
+ * data layer by `tenantPlugin`, which reads the tenant from this context.
+ *
+ * Resolution priority:
+ *   1. Authenticated user's tenantId (set by auth middleware)
+ *   2. x-tenant-id header (service-to-service / trusted callers)
+ *   3. tenantId query param (development only)
+ *
+ * Admin requests are intentionally NOT scoped (global visibility).
+ */
+const PUBLIC_PREFIXES = ["/health", "/ready", "/live", "/api/v1/public", "/api/v1/webhooks"];
 
-// List of collections that are tenant-specific (require isolation)
-const TENANT_COLLECTIONS = [
-  'users',
-  'servicerecords',
-  'reminders',
-  'invitations',
-  'appointments',
-  'invoices',
-  'payments',
-  'servicetemplates',
-  'reviews',
-  'notifications',
-  'documents',
-  'parts',
-  'inventory',
-  'supporttickets'
-];
+export const tenantIsolation = (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): void => {
+  try {
+    // Public endpoints are never tenant-scoped.
+    if (PUBLIC_PREFIXES.some((p) => req.path.startsWith(p))) {
+      return next();
+    }
 
-// Middleware to add tenant filter to all database queries
-export const tenantIsolation = (req: Request, res: Response, next: NextFunction): void => {
-  // Skip tenant isolation for public routes and health checks
-  const publicPaths = ['/health', '/ready', '/live', '/api/v1/public', '/api/v1/webhooks'];
-  if (publicPaths.some(path => req.path.startsWith(path))) {
-    return next();
+    const userRoles = (req as any).user?.roles ?? [(req as any).user?.role];
+    const isAdmin = Array.isArray(userRoles) && userRoles.includes("admin");
+
+    // Already resolved from JWT by auth middleware.
+    let tenantId = (req as any).user?.tenantId as string | undefined;
+
+    // Trusted header override (e.g. internal services, subdomain routing).
+    if (!tenantId && req.headers["x-tenant-id"]) {
+      tenantId = req.headers["x-tenant-id"] as string;
+    } else if (!tenantId && (req.query as any).tenantId && process.env.NODE_ENV === "development") {
+      tenantId = (req.query as any).tenantId as string;
+    }
+
+    // Persist into the AsyncLocalStorage-backed context used by the plugin.
+    if (tenantId) {
+      (req as any).tenantId = tenantId;
+      req.context?.set("tenantId", tenantId);
+      res.setHeader("X-Tenant-ID", tenantId);
+    }
+    if (Array.isArray(userRoles)) {
+      req.context?.set("userRoles", userRoles);
+    }
+
+    // Admin bypasses tenant scoping entirely.
+    if (isAdmin) {
+      req.context?.set("userRoles", ["admin"]);
+    }
+
+    next();
+  } catch (err) {
+    logger.error({ type: "tenant_resolution_error", error: (err as Error).message });
+    next(
+      AppError.fromCode("TENANT_CONTEXT_REQUIRED", {
+        correlationId: (req as any).id,
+        message: "Unable to resolve tenant context",
+      }),
+    );
   }
-  
-  // Skip for admin routes (admin can see all tenants)
-  if (req.path.startsWith('/api/v1/admin') && (req as any).userRole === 'admin') {
-    return next();
-  }
-  
-  const tenantId = (req as any).tenantId;
-  
-  // For tenant-specific operations, tenant ID is required
-  const isTenantOperation = TENANT_COLLECTIONS.some(collection => 
-    req.path.includes(collection) || 
-    req.baseUrl?.includes(collection)
-  );
-  
-  if (isTenantOperation && !tenantId) {
-    logger.warn({
-      type: 'tenant_isolation',
-      requestId: (req as any).id,
-      path: req.path,
-      message: 'Tenant ID required for this operation'
-    });
-    return next(new AuthorizationError('Tenant context required for this operation'));
-  }
-  
-  // Store tenant filter in request for use in controllers
-  (req as any).tenantFilter = tenantId ? { tenantId } : null;
-  
-  // Override mongoose query methods to automatically add tenant filter
-  if (tenantId && isTenantOperation) {
-    const originalFind = mongoose.Query.prototype.find;
-    const originalFindOne = mongoose.Query.prototype.findOne;
-    const originalFindById = mongoose.Model.findById;
-    
-    // Note: This is a simplified example. In production, use a more robust approach
-    // like Mongoose plugins or repository pattern
-    
-    // Store original methods to avoid infinite recursion
-    (req as any)._originalFind = originalFind;
-    (req as any)._originalFindOne = originalFindOne;
-  }
-  
-  next();
 };
 
-// Helper function to apply tenant filter to query
-export const applyTenantFilter = (req: Request, query: any, collectionName: string): any => {
-  // Skip for shared collections
-  if (SHARED_COLLECTIONS.includes(collectionName)) {
-    return query;
-  }
-  
-  // Skip for admin
-  if ((req as any).userRole === 'admin') {
-    return query;
-  }
-  
-  const tenantId = (req as any).tenantId;
-  
-  if (tenantId && TENANT_COLLECTIONS.includes(collectionName)) {
-    // Apply tenant filter based on schema structure
-    if (collectionName === 'users') {
-      return { ...query, serviceCenterId: tenantId };
-    }
-    if (collectionName === 'servicerecords') {
-      return { ...query, serviceCenterId: tenantId };
-    }
-    if (collectionName === 'appointments') {
-      return { ...query, serviceCenterId: tenantId };
-    }
-    // Add more collection mappings as needed
-    return { ...query, tenantId };
-  }
-  
-  return query;
-};
-
-// Middleware to validate cross-tenant access
+/**
+ * Validates that a resource belongs to the requesting tenant. Use for explicit
+ * ownership checks (e.g. vehicles shared across tenants).
+ */
 export const validateCrossTenantAccess = async (
   req: Request,
   resourceType: string,
   resourceId: string,
-  requiredAccess: 'read' | 'write' = 'read'
 ): Promise<boolean> => {
   const tenantId = (req as any).tenantId;
   const userId = (req as any).userId;
-  const userRole = (req as any).userRole;
-  
-  // Admin has full access
-  if (userRole === 'admin') {
-    return true;
-  }
-  
-  // For vehicles (shared resource), check authorization
-  if (resourceType === 'vehicle') {
-    const Vehicle = mongoose.model('Vehicle');
+  const userRoles = (req as any).user?.roles ?? [(req as any).user?.role];
+
+  if (userRoles?.includes("admin")) return true;
+
+  if (resourceType === "vehicle") {
+    const Vehicle = mongoose.model("Vehicle");
     const vehicle = await Vehicle.findById(resourceId);
-    
-    if (!vehicle) {
-      return false;
-    }
-    
-    // Owner has full access
-    if (vehicle.currentOwnerId.toString() === userId) {
-      return true;
-    }
-    
-    // Check if service center is authorized
+    if (!vehicle) return false;
+    if (vehicle.currentOwnerId?.toString() === userId) return true;
     if (tenantId) {
-      const isAuthorized = vehicle.authorizedServiceCenters?.some(
-        (center: any) => 
-          center.serviceCenterId.toString() === tenantId && 
-          center.status === 'active'
+      const authorized = vehicle.authorizedServiceCenters?.some(
+        (center: any) => center.serviceCenterId?.toString() === tenantId && center.status === "active",
       );
-      
-      if (isAuthorized) {
-        return true;
-      }
+      if (authorized) return true;
     }
   }
-  
   return false;
 };
+
+

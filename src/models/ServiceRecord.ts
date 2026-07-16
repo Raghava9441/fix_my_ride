@@ -1,5 +1,6 @@
 // models/ServiceRecord.js
 import mongoose, { Schema } from "mongoose";
+import { tenantPlugin } from '../middleware/tenant/tenantPlugin';
 
 const serviceRecordSchema = new Schema({
   tenantId: Schema.Types.ObjectId,
@@ -82,5 +83,7 @@ const serviceRecordSchema = new Schema({
 serviceRecordSchema.index({ vehicleId: 1, serviceDate: -1 });
 serviceRecordSchema.index({ serviceCenterId: 1, serviceDate: -1 });
 serviceRecordSchema.index({ ownerId: 1, serviceDate: -1 });
+
+serviceRecordSchema.plugin(tenantPlugin);
 
 export const ServiceRecord = mongoose.model('ServiceRecord', serviceRecordSchema);
