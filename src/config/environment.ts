@@ -1,135 +1,162 @@
 // src/config/environment.ts
-import dotenv from 'dotenv';
-import path from 'path';
+/**
+ * Structured, typed application configuration.
+ *
+ * This module is the single, validated source of truth consumed across the
+ * app (import `{ config }` here). It is derived from the Zod-validated raw
+ * environment (see ./load.ts + ./schema.ts), so every value is guaranteed to
+ * exist and be correctly typed by the time the app boots.
+ */
+import { loadEnv } from "./load";
 
-// Load environment variables based on NODE_ENV
-const envFile = process.env.NODE_ENV === 'production'
-    ? '.env.production'
-    : process.env.NODE_ENV === 'test'
-        ? '.env.test'
-        : '.env.development';
+const env = loadEnv();
 
-dotenv.config({ path: path.resolve(process.cwd(), envFile) });
-dotenv.config({ path: path.resolve(process.cwd(), '.env') }); // Fallback
-
-// Validate required environment variables
-const requiredEnvVars = [
-    'NODE_ENV',
-    'PORT',
-    'MONGODB_URI',
-    'JWT_SECRET',
-    'JWT_REFRESH_SECRET'
-];
-
-for (const envVar of requiredEnvVars) {
-    if (!process.env[envVar]) {
-        throw new Error(`Missing required environment variable: ${envVar}`);
-    }
-}
-
+/**
+ * Structured configuration object.
+ * Shape is preserved for backwards compatibility with existing importers.
+ */
 export const config = {
-    env: process.env.NODE_ENV || 'development',
-    
-    port: parseInt(process.env.PORT || '3000', 10),
-    host: process.env.HOST || '0.0.0.0',
-    appUrl: process.env.APP_URL || `http://localhost:${process.env.PORT || 3000}`,
+  env: env.NODE_ENV,
+  isProduction: env.NODE_ENV === "production",
+  isStaging: env.NODE_ENV === "staging",
+  isTest: env.NODE_ENV === "test",
+  isDevelopment: env.NODE_ENV === "development",
 
-    db: {
-        uri: process.env.MONGODB_URI!,
-        name: process.env.MONGODB_NAME || 'fix_my_ride',
-        maxPoolSize: parseInt(process.env.MONGODB_MAX_POOL_SIZE || '10', 10),
-        minPoolSize: parseInt(process.env.MONGODB_MIN_POOL_SIZE || '2', 10),
-        socketTimeoutMS: parseInt(process.env.MONGODB_SOCKET_TIMEOUT_MS || '30000', 10),
-        connectTimeoutMS: parseInt(process.env.MONGODB_CONNECT_TIMEOUT_MS || '10000', 10),
-    },
+  port: env.PORT,
+  host: env.HOST,
+  appUrl: env.APP_URL ?? `http://localhost:${env.PORT}`,
 
-    jwt: {
-        secret: process.env.JWT_SECRET!,
-        expiresIn: process.env.JWT_EXPIRES_IN || '7d',
-        refreshSecret: process.env.JWT_REFRESH_SECRET!,
-        refreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '30d',
-    },
+  db: {
+    uri: env.MONGODB_URI,
+    name: env.MONGODB_NAME,
+    maxPoolSize: env.MONGODB_MAX_POOL_SIZE,
+    minPoolSize: env.MONGODB_MIN_POOL_SIZE,
+    socketTimeoutMS: env.MONGODB_SOCKET_TIMEOUT_MS,
+    connectTimeoutMS: env.MONGODB_CONNECT_TIMEOUT_MS,
+    ssl: env.MONGODB_SSL,
+  },
 
-    redis: {
-        host: process.env.REDIS_HOST || 'localhost',
-        port: parseInt(process.env.REDIS_PORT || '6379', 10),
-        password: process.env.REDIS_PASSWORD,
-        db: parseInt(process.env.REDIS_DB || '0', 10),
-    },
+  jwt: {
+    secret: env.JWT_SECRET,
+    expiresIn: env.JWT_EXPIRES_IN,
+    refreshSecret: env.JWT_REFRESH_SECRET,
+    refreshExpiresIn: env.JWT_REFRESH_EXPIRES_IN,
+  },
 
-    email: {
-        host: process.env.SMTP_HOST,
-        port: parseInt(process.env.SMTP_PORT || '587', 10),
-        user: process.env.SMTP_USER,
-        password: process.env.SMTP_PASSWORD,
-        from: process.env.EMAIL_FROM || 'noreply@vehicleservice.com',
-    },
+  redis: {
+    host: env.REDIS_HOST,
+    port: env.REDIS_PORT,
+    password: env.REDIS_PASSWORD,
+    db: env.REDIS_DB,
+    url: env.REDIS_URL,
+  },
 
-    sms: {
-        accountSid: process.env.TWILIO_ACCOUNT_SID,
-        authToken: process.env.TWILIO_AUTH_TOKEN,
-        phoneNumber: process.env.TWILIO_PHONE_NUMBER,
-    },
+  email: {
+    host: env.SMTP_HOST,
+    port: env.SMTP_PORT,
+    secure: env.SMTP_SECURE,
+    user: env.SMTP_USER,
+    password: env.SMTP_PASSWORD,
+    from: env.EMAIL_FROM,
+  },
 
-    storage: {
-        provider: process.env.STORAGE_PROVIDER || 'local', // local, s3, cloudinary
-        s3: {
-            accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-            secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-            bucket: process.env.AWS_S3_BUCKET,
-            region: process.env.AWS_REGION,
-        },
-        cloudinary: {
-            cloudName: process.env.CLOUDINARY_CLOUD_NAME,
-            apiKey: process.env.CLOUDINARY_API_KEY,
-            apiSecret: process.env.CLOUDINARY_API_SECRET,
-        },
-    },
+  sms: {
+    accountSid: env.TWILIO_ACCOUNT_SID,
+    authToken: env.TWILIO_AUTH_TOKEN,
+    phoneNumber: env.TWILIO_PHONE_NUMBER,
+  },
 
-    rateLimit: {
-        windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '900000', 10), // 15 minutes
-        max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || '100', 10),
+  storage: {
+    provider: env.STORAGE_PROVIDER,
+    uploadDir: env.UPLOAD_DIR,
+    maxFileSize: env.MAX_FILE_SIZE,
+    s3: {
+      accessKeyId: env.AWS_ACCESS_KEY_ID,
+      secretAccessKey: env.AWS_SECRET_ACCESS_KEY,
+      bucket: env.AWS_S3_BUCKET,
+      region: env.AWS_REGION,
     },
+    cloudinary: {
+      cloudName: env.CLOUDINARY_CLOUD_NAME,
+      apiKey: env.CLOUDINARY_API_KEY,
+      apiSecret: env.CLOUDINARY_API_SECRET,
+    },
+  },
 
-    cors: {
-        allowedOrigins: process.env.CORS_ALLOWED_ORIGINS?.split(',') || ['http://localhost:3000'],
-    },
+  rateLimit: {
+    windowMs: env.RATE_LIMIT_WINDOW_MS,
+    max: env.RATE_LIMIT_MAX_REQUESTS,
+  },
 
-    logging: {
-        level: process.env.LOG_LEVEL || 'info',
-        prettyPrint: process.env.NODE_ENV !== 'production',
-    },
+  cors: {
+    allowedOrigins: env.CORS_ALLOWED_ORIGINS,
+  },
 
-    stripe: {
-        secretKey: process.env.STRIPE_SECRET_KEY,
-        webhookSecret: process.env.STRIPE_WEBHOOK_SECRET,
-    },
+  logging: {
+    level: env.LOG_LEVEL,
+    prettyPrint: env.LOG_PRETTY,
+  },
 
-    paypal: {
-        clientId: process.env.PAYPAL_CLIENT_ID,
-        clientSecret: process.env.PAYPAL_CLIENT_SECRET,
-        environment: process.env.PAYPAL_ENVIRONMENT || 'sandbox',
-    },
+  stripe: {
+    secretKey: env.STRIPE_SECRET_KEY,
+    webhookSecret: env.STRIPE_WEBHOOK_SECRET,
+  },
 
-    google: {
-        clientId: process.env.GOOGLE_CLIENT_ID,
-        clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-        callbackUrl: process.env.GOOGLE_CALLBACK_URL,
-    },
+  paypal: {
+    clientId: env.PAYPAL_CLIENT_ID,
+    clientSecret: env.PAYPAL_CLIENT_SECRET,
+    environment: env.PAYPAL_ENVIRONMENT,
+  },
 
-    facebook: {
-        clientId: process.env.FACEBOOK_CLIENT_ID,
-        clientSecret: process.env.FACEBOOK_CLIENT_SECRET,
-        callbackUrl: process.env.FACEBOOK_CALLBACK_URL,
-    },
+  google: {
+    clientId: env.GOOGLE_CLIENT_ID,
+    clientSecret: env.GOOGLE_CLIENT_SECRET,
+    callbackUrl: env.GOOGLE_CALLBACK_URL,
+  },
 
-    maintenance: {
-        enabled: process.env.MAINTENANCE_MODE === 'true',
-        message: process.env.MAINTENANCE_MESSAGE || 'System is under maintenance. Please check back later.',
-    },
+  facebook: {
+    clientId: env.FACEBOOK_CLIENT_ID,
+    clientSecret: env.FACEBOOK_CLIENT_SECRET,
+    callbackUrl: env.FACEBOOK_CALLBACK_URL,
+  },
 
-    monitoring: {
-        sentryDsn: process.env.SENTRY_DSN,
-        newRelicKey: process.env.NEW_RELIC_LICENSE_KEY,
-    },
+  maintenance: {
+    enabled: env.MAINTENANCE_MODE,
+    message: env.MAINTENANCE_MESSAGE,
+  },
+
+  monitoring: {
+    sentryDsn: env.SENTRY_DSN || undefined,
+    newRelicKey: env.NEW_RELIC_LICENSE_KEY,
+  },
+
+  security: {
+    bcryptRounds: env.BCRYPT_ROUNDS,
+    sessionTimeoutMinutes: env.SESSION_TIMEOUT_MINUTES,
+    cookieSecret: env.COOKIE_SECRET,
+  },
+
+  featureFlags: {
+    enableSignup: env.ENABLE_SIGNUP,
+    enableMfa: env.ENABLE_MFA,
+  },
+
+  seed: {
+    db: env.SEED_DB,
+    sampleData: env.SEED_SAMPLE_DATA,
+    adminEmail: env.SEED_ADMIN_EMAIL,
+    adminPassword: env.SEED_ADMIN_PASSWORD,
+    adminFirstname: env.SEED_ADMIN_FIRSTNAME,
+    adminLastname: env.SEED_ADMIN_LASTNAME,
+    adminPhone: env.SEED_ADMIN_PHONE,
+    tenantName: env.SEED_TENANT_NAME,
+    tenantSlug: env.SEED_TENANT_SLUG,
+  },
+
+  trustedProxies: env.TRUSTED_PROXIES,
 };
+
+/** Raw validated environment (typed). Use for variables not in `config`. */
+export { env };
+
+export default config;

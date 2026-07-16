@@ -7,11 +7,14 @@ package-lock.json
 yarn.lock
 
 # Environment
-# .env
-# .env.local
-# .env.development
-# .env.production
-# .env*.local
+# Real secrets — never commit. These are git-ignored.
+.env
+.env.*
+!.env.example
+!.env.test
+# Local overrides (per-developer) — also ignored.
+.env.local
+.env.*.local
 
 # Build
 dist/

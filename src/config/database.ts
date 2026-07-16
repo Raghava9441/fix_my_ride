@@ -1,8 +1,6 @@
 // config/database.js
 import mongoose from 'mongoose';
-import dotenv from 'dotenv';
-
-dotenv.config();
+import { config } from './environment';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -31,29 +29,24 @@ const state = {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-const envInt = (key, fallback) => {
-  const val = parseInt(process.env[key], 10);
-  return Number.isNaN(val) ? fallback : val;
-};
-
 // ─── Connection options ───────────────────────────────────────────────────────
 
 const buildConnectionOptions = () => ({
-  maxPoolSize:              envInt('MONGODB_POOL_SIZE',                    DB_DEFAULTS.POOL_SIZE_MAX),
-  minPoolSize:              envInt('MONGODB_MIN_POOL_SIZE',                DB_DEFAULTS.POOL_SIZE_MIN),
-  maxIdleTimeMS:            envInt('MONGODB_MAX_IDLE_TIME_MS',             DB_DEFAULTS.MAX_IDLE_TIME_MS),
-  connectTimeoutMS:         envInt('MONGODB_CONNECTION_TIMEOUT_MS',        DB_DEFAULTS.CONNECT_TIMEOUT_MS),
-  socketTimeoutMS:          envInt('MONGODB_SOCKET_TIMEOUT_MS',            DB_DEFAULTS.SOCKET_TIMEOUT_MS),
-  serverSelectionTimeoutMS: envInt('MONGODB_SERVER_SELECTION_TIMEOUT_MS',  DB_DEFAULTS.SERVER_SELECTION_TIMEOUT_MS),
-  heartbeatFrequencyMS:     envInt('MONGODB_HEARTBEAT_FREQUENCY_MS',       DB_DEFAULTS.HEARTBEAT_FREQUENCY_MS),
-  w:                        process.env.MONGODB_WRITE_CONCERN              || DB_DEFAULTS.WRITE_CONCERN,
-  wtimeoutMS:               envInt('MONGODB_W_TIMEOUT_MS',                 DB_DEFAULTS.WRITE_TIMEOUT_MS),
-  readPreference:           process.env.MONGODB_READ_PREFERENCE            || DB_DEFAULTS.READ_PREFERENCE,
+  maxPoolSize:              config.db.maxPoolSize    || DB_DEFAULTS.POOL_SIZE_MAX,
+  minPoolSize:              config.db.minPoolSize    || DB_DEFAULTS.POOL_SIZE_MIN,
+  maxIdleTimeMS:            DB_DEFAULTS.MAX_IDLE_TIME_MS,
+  connectTimeoutMS:         config.db.connectTimeoutMS || DB_DEFAULTS.CONNECT_TIMEOUT_MS,
+  socketTimeoutMS:          config.db.socketTimeoutMS  || DB_DEFAULTS.SOCKET_TIMEOUT_MS,
+  serverSelectionTimeoutMS: DB_DEFAULTS.SERVER_SELECTION_TIMEOUT_MS,
+  heartbeatFrequencyMS:     DB_DEFAULTS.HEARTBEAT_FREQUENCY_MS,
+  w:                        DB_DEFAULTS.WRITE_CONCERN,
+  wtimeoutMS:               DB_DEFAULTS.WRITE_TIMEOUT_MS,
+  readPreference:           DB_DEFAULTS.READ_PREFERENCE,
   retryWrites:              true,
   retryReads:               true,
   compressors:              ['zstd', 'snappy', 'zlib'],
 
-  ...(process.env.NODE_ENV === 'production' && {
+  ...(config.isProduction && {
     ssl:                         true,
     tls:                         true,
     tlsAllowInvalidCertificates: false,
@@ -131,16 +124,16 @@ export const connectDatabase = async () => {
     return mongoose.connection;
   }
 
-  if (!process.env.MONGODB_URI) {
+  if (!config.db.uri) {
     throw new Error('MONGODB_URI is required');
   }
 
   setupMongooseEvents();
 
   try {
-    await mongoose.connect(process.env.MONGODB_URI, buildConnectionOptions());
+    await mongoose.connect(config.db.uri, buildConnectionOptions());
 
-    if (process.env.NODE_ENV === 'production') {
+    if (config.isProduction) {
       await mongoose.syncIndexes({ background: true });
     }
 
@@ -186,7 +179,7 @@ export const checkDatabaseHealth = async () => {
       readyState: mongoose.connection.readyState,
       host:       mongoose.connection.host,
       name:       mongoose.connection.name,
-      poolSize:   envInt('MONGODB_POOL_SIZE', DB_DEFAULTS.POOL_SIZE_MAX),
+      poolSize:   config.db.maxPoolSize,
     };
   } catch (err) {
     return {
