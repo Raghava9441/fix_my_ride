@@ -8,7 +8,7 @@ import cookieParser from "cookie-parser";
 import expressRateLimit from "express-rate-limit";
 import mongoSanitize from "express-mongo-sanitize";
 import hpp from "hpp";
-import { v4 as uuidv4 } from "uuid";
+import { randomUUID } from "crypto";
 import mongoose from "mongoose";
 
 // Import configurations
@@ -50,7 +50,7 @@ const app: Application = express();
 // Request ID Middleware
 // ========================================
 app.use((req: Request, res: Response, next: NextFunction) => {
-  req.id = uuidv4();
+  req.id = randomUUID();
   res.setHeader("X-Request-ID", req.id);
   next();
 });
