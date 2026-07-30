@@ -22,7 +22,7 @@ export const uuidSchema = z.string().uuid("Invalid UUID format");
 
 export const indianPhoneSchema = z
   .string()
-  .regex(/^(\+91[\-\s]?)?[0]?(91)?[6-9]\d{9}$/, "Invalid Indian phone number");
+  .regex(/^(\+91[-\s]?)?[0]?(91)?[6-9]\d{9}$/, "Invalid Indian phone number");
 
 export const passwordSchema = z
   .string()

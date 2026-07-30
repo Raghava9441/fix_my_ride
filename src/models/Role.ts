@@ -125,7 +125,7 @@ roleSchema.methods.getAllPermissions = async function (this: IRole) {
   // Get direct permissions
   await this.populate('permissions');
   const populatedPermissions = this.permissions as unknown as { key: string }[];
-  let allPerms = new Set(populatedPermissions.map(p => p.key));
+  const allPerms = new Set(populatedPermissions.map(p => p.key));
 
   // Get inherited permissions
   if (this.inheritsFrom?.length > 0) {

@@ -1,7 +1,29 @@
 // models/AuditLog.js
-const { mongoose, Schema } = require('../config/database');
+import mongoose, { Schema, Document, Model, Types } from "mongoose";
 
-const auditLogSchema = new Schema({
+export interface IAuditLog extends Document {
+  tenantId?: Types.ObjectId;
+  actorId: Types.ObjectId;
+  actorRole?: 'owner' | 'staff' | 'admin' | 'system';
+  actorEmail?: string;
+  action: 'CREATE' | 'READ' | 'UPDATE' | 'DELETE' | 'LOGIN' | 'LOGOUT' | 'GRANT_ACCESS' | 'REVOKE_ACCESS';
+  entityType: 'Vehicle' | 'ServiceRecord' | 'Account' | 'OwnerProfile' | 'StaffProfile' | 'ServiceCenter';
+  entityId: Types.ObjectId;
+  changes: Types.DocumentArray<{
+    field?: string;
+    oldValue?: any;
+    newValue?: any;
+  }>;
+  ipAddress?: string;
+  userAgent?: string;
+  recordedAt: Date;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface IAuditLogModel extends Model<IAuditLog> {}
+
+const auditLogSchema = new Schema<IAuditLog, IAuditLogModel>({
   tenantId: Schema.Types.ObjectId,
 
   // Actor (Account)
@@ -49,4 +71,4 @@ auditLogSchema.index({ actorId: 1, recordedAt: -1 });
 auditLogSchema.index({ entityId: 1, recordedAt: -1 });
 auditLogSchema.index({ recordedAt: 1 }, { expireAfterSeconds: 63072000 }); // 2 years
 
-export const AuditLog = mongoose.model('AuditLog', auditLogSchema);
+export const AuditLog = mongoose.model<IAuditLog, IAuditLogModel>('AuditLog', auditLogSchema);

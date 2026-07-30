@@ -112,7 +112,7 @@ export class ApiResponse<T = any> {
 export class ApiError extends Error {
     public readonly statusCode: number;
     public readonly errors: ValidationErrorDetail[];
-    public readonly success: false = false;
+    public readonly success = false as const;
     public readonly timestamp: string;
     public readonly requestId?: string;
     public readonly errorCode?: string;

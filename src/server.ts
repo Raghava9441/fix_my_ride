@@ -13,7 +13,6 @@ import app from "./app";
 
 // Global variables
 let server: any;
-let isShuttingDown = false;
 
 // ========================================
 // Server Initialization

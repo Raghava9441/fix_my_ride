@@ -1,0 +1,83 @@
+# Full local stack: app + MongoDB + Redis.
+#
+# Usage:
+#   docker-compose up -d --build     # start everything
+#   docker-compose logs -f app       # tail app logs
+#   docker-compose down              # stop (add -v to also wipe data volumes)
+#
+# The app container talks to `mongo` and `redis` by service name (Docker's
+# internal DNS), not `localhost` — that's why MONGODB_URI/REDIS_HOST are
+# overridden below even though .env.development points at localhost for
+# native (non-Docker) `npm run dev` usage.
+
+services:
+  app:
+    # `build:` is used for local dev (`docker-compose up --build`).
+    # `image:` is what a server pulls in production, once CI has pushed it
+    # (see .github/workflows/ci-cd.yml) — set IMAGE_NAME to your
+    # ghcr.io/<owner>/<repo> before deploying to a server.
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: ${IMAGE_NAME:-fix-my-ride-app}:${IMAGE_TAG:-latest}
+    container_name: fix-my-ride-app
+    restart: unless-stopped
+    ports:
+      - "${PORT:-5000}:5000"
+    env_file:
+      - .env.development
+    environment:
+      MONGODB_URI: mongodb://mongo:27017/fix_my_ride
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+    volumes:
+      - uploads-data:/app/uploads
+    depends_on:
+      mongo:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - fix-my-ride-net
+
+  mongo:
+    image: mongo:7
+    container_name: fix-my-ride-mongo
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - fix-my-ride-net
+
+  redis:
+    image: redis:7-alpine
+    container_name: fix-my-ride-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    networks:
+      - fix-my-ride-net
+
+networks:
+  fix-my-ride-net:
+
+volumes:
+  mongo-data:
+  redis-data:
+  uploads-data:

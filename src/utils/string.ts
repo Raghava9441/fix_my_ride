@@ -171,10 +171,11 @@ export function pad(
       return char.repeat(padLength) + str;
     case "right":
       return str + char.repeat(padLength);
-    case "both":
+    case "both": {
       const leftPad = Math.floor(padLength / 2);
       const rightPad = padLength - leftPad;
       return char.repeat(leftPad) + str + char.repeat(rightPad);
+    }
   }
 }
 
