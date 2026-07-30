@@ -440,13 +440,21 @@ export class VehicleService {
     });
 
     vehicle.currentOwnerId = new mongoose.Types.ObjectId(newOwnerId);
-    vehicle.currentOdometer = {
-      ...vehicle.currentOdometer,
-    };
 
     await vehicle.save();
 
-    await newOwner.addVehicle(vehicleId, vehicleId, false);
+    const alreadyOwned = newOwner.vehicles.some(
+      (v) => v.vehicleId?.toString() === vehicleId,
+    );
+    if (!alreadyOwned) {
+      newOwner.vehicles.push({
+        vehicleId: new mongoose.Types.ObjectId(vehicleId),
+        addedAt: new Date(),
+        isPrimary: false,
+      });
+      newOwner.stats.totalVehicles = newOwner.vehicles.length;
+      await newOwner.save();
+    }
 
     return vehicle;
   }

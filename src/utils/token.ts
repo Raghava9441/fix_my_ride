@@ -134,32 +134,6 @@ export function generateRandomBytes(length: number = 32): Buffer {
 }
 
 /**
- * Generate HMAC signature
- */
-export function generateHmac(
-  data: string,
-  secret: string,
-  algorithm: "sha256" | "sha512" = "sha256",
-): string {
-  const hmac = crypto.createHmac(algorithm, secret);
-  hmac.update(data);
-  return hmac.digest("hex");
-}
-
-/**
- * Verify HMAC signature
- */
-export function verifyHmac(
-  data: string,
-  secret: string,
-  signature: string,
-  algorithm: "sha256" | "sha512" = "sha256",
-): boolean {
-  const expected = generateHmac(data, secret, algorithm);
-  return crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected));
-}
-
-/**
  * Get token expiration time
  */
 export function getTokenExpiry(token: string): Date | null {

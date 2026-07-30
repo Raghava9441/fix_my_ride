@@ -1,7 +1,6 @@
 import { OwnerProfile } from "../models/OwnerProfile";
 import { Vehicle } from "../models/Vehicle";
 import { ServiceRecord } from "../models/ServiceRecord";
-import { Owner } from "../models/OwnerProfile";
 import mongoose from "mongoose";
 
 export interface CreateOwnerProfileInput {
@@ -182,7 +181,7 @@ export class OwnerProfileService {
     }
 
     const vehicleExists = owner.vehicles.some(
-      (v) => v.vehicleId.toString() === vehicleId,
+      (v) => v.vehicleId?.toString() === vehicleId,
     );
 
     if (vehicleExists) {
@@ -219,9 +218,10 @@ export class OwnerProfileService {
       throw new Error("Owner profile not found");
     }
 
-    owner.vehicles = owner.vehicles.filter(
-      (v) => v.vehicleId.toString() !== vehicleId,
+    const remainingVehicles = owner.vehicles.filter(
+      (v) => v.vehicleId?.toString() !== vehicleId,
     );
+    owner.vehicles.splice(0, owner.vehicles.length, ...remainingVehicles);
     owner.stats.totalVehicles = owner.vehicles.length;
 
     if (owner.defaultVehicleId?.toString() === vehicleId) {
@@ -249,7 +249,7 @@ export class OwnerProfileService {
     }
 
     return owner.vehicles.map((v) => ({
-      ...v.vehicleId.toObject(),
+      ...(v.vehicleId as any)?.toObject(),
       isPrimary: v.isPrimary,
       addedAt: v.addedAt,
     }));

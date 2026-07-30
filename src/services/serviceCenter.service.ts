@@ -383,9 +383,10 @@ export class ServiceCenterService {
       throw new Error("Service center not found");
     }
 
-    center.servicesOffered = center.servicesOffered.filter(
+    const remaining = center.servicesOffered.filter(
       (s) => s.name !== serviceName,
     );
+    center.servicesOffered.splice(0, center.servicesOffered.length, ...remaining);
 
     await center.save();
     return center;

@@ -33,7 +33,7 @@ function getActiveTenantId(): { tenantId?: string; isAdmin: boolean; hasContext:
 }
 
 export const tenantPlugin = (
-  schema: Schema,
+  schema: Schema<any, any, any, any, any, any>,
   options: TenantPluginOptions = {},
 ): void => {
   const shared = new Set([...DEFAULT_SHARED, ...(options.sharedCollections ?? [])]);

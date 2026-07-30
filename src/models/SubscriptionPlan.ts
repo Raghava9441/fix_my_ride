@@ -51,7 +51,11 @@ export interface ISubscriptionPlan extends Document {
   isDeleted: boolean;
 }
 
-const subscriptionPlanSchema = new Schema<ISubscriptionPlan>({
+export interface ISubscriptionPlanModel extends mongoose.Model<ISubscriptionPlan> {
+  seedDefaults(): Promise<void>;
+}
+
+const subscriptionPlanSchema = new Schema<ISubscriptionPlan, ISubscriptionPlanModel>({
   name: {
     type: String,
     required: true,
@@ -150,7 +154,7 @@ subscriptionPlanSchema.index({ type: 1, isActive: 1 });
 subscriptionPlanSchema.index({ isPublic: 1, displayOrder: 1 });
 
 // Static: Seed default plans
-subscriptionPlanSchema.statics.seedDefaults = async function() {
+subscriptionPlanSchema.statics.seedDefaults = async function(this: ISubscriptionPlanModel) {
   const plans = [
     {
       name: 'Free',
@@ -268,4 +272,4 @@ subscriptionPlanSchema.statics.seedDefaults = async function() {
 
 subscriptionPlanSchema.plugin(tenantPlugin);
 
-export const SubscriptionPlan = mongoose.model<ISubscriptionPlan>('SubscriptionPlan', subscriptionPlanSchema);
+export const SubscriptionPlan = mongoose.model<ISubscriptionPlan, ISubscriptionPlanModel>('SubscriptionPlan', subscriptionPlanSchema);

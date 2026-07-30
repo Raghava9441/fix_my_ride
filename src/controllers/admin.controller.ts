@@ -1,14 +1,15 @@
 import { Request, Response, NextFunction } from "express";
 import { asyncHandler, createSuccessResponse, HttpStatus } from "../utils";
 
-export const reportController = {
+export const adminController = {
   getDashboard: asyncHandler(
     async (req: Request, res: Response, next: NextFunction) => {
       const result = {
-        totalRevenue: 500000,
-        totalVehicles: 150,
-        totalServiceRecords: 320,
-        activeCustomers: 100,
+        totalTenants: 50,
+        totalUsers: 1000,
+        totalVehicles: 500,
+        totalServiceRecords: 2000,
+        revenue: 5000000,
       };
       const response = createSuccessResponse(
         result,
@@ -19,218 +20,271 @@ export const reportController = {
     },
   ),
 
-  getCenterRevenue: asyncHandler(
+  getSystemStats: asyncHandler(
     async (req: Request, res: Response, next: NextFunction) => {
-      const result = { total: 250000, monthly: 50000, daily: 5000 };
+      const result = {
+        cpu: "45%",
+        memory: "60%",
+        disk: "70%",
+        uptime: "30 days",
+      };
       const response = createSuccessResponse(
         result,
-        "Revenue report retrieved successfully",
+        "System stats retrieved successfully",
         HttpStatus.OK,
       );
       res.status(response.statusCode).json(response.toJSON());
     },
   ),
 
-  getCenterVehiclesReport: asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => {
-      const result = { total: 150, active: 100, inactive: 50 };
-      const response = createSuccessResponse(
-        result,
-        "Vehicles report retrieved successfully",
-        HttpStatus.OK,
-      );
-      res.status(response.statusCode).json(response.toJSON());
-    },
-  ),
-
-  getCenterServicesReport: asyncHandler(
+  getAllTenants: asyncHandler(
     async (req: Request, res: Response, next: NextFunction) => {
       const result = [
-        { service: "Oil Change", count: 50, revenue: 250000 },
-        { service: "Tire Rotation", count: 30, revenue: 90000 },
+        { id: "tenant-1", name: "Tenant One", status: "active" },
+        { id: "tenant-2", name: "Tenant Two", status: "active" },
       ];
       const response = createSuccessResponse(
         result,
-        "Services report retrieved successfully",
+        "Tenants retrieved successfully",
         HttpStatus.OK,
       );
       res.status(response.statusCode).json(response.toJSON());
     },
   ),
 
-  getStaffPerformance: asyncHandler(
+  createTenant: asyncHandler(
+    async (req: Request, res: Response, next: NextFunction) => {
+      const result = { id: "new-tenant-id", ...req.body, status: "active" };
+      const response = createSuccessResponse(
+        result,
+        "Tenant created successfully",
+        HttpStatus.CREATED,
+      );
+      res.status(response.statusCode).json(response.toJSON());
+    },
+  ),
+
+  getTenantById: asyncHandler(
+    async (req: Request, res: Response, next: NextFunction) => {
+      const result = {
+        id: req.params.id,
+        name: "Tenant One",
+        status: "active",
+      };
+      const response = createSuccessResponse(
+        result,
+        "Tenant retrieved successfully",
+        HttpStatus.OK,
+      );
+      res.status(response.statusCode).json(response.toJSON());
+    },
+  ),
+
+  updateTenant: asyncHandler(
+    async (req: Request, res: Response, next: NextFunction) => {
+      const result = { id: req.params.id, ...req.body };
+      const response = createSuccessResponse(
+        result,
+        "Tenant updated successfully",
+        HttpStatus.OK,
+      );
+      res.status(response.statusCode).json(response.toJSON());
+    },
+  ),
+
+  deleteTenant: asyncHandler(
+    async (req: Request, res: Response, next: NextFunction) => {
+      const result = {
+        id: req.params.id,
+        deleted: true,
+        deletedAt: new Date().toISOString(),
+      };
+      const response = createSuccessResponse(
+        result,
+        "Tenant deleted successfully",
+        HttpStatus.OK,
+      );
+      res.status(response.statusCode).json(response.toJSON());
+    },
+  ),
+
+  updateTenantStatus: asyncHandler(
+    async (req: Request, res: Response, next: NextFunction) => {
+      const result = { id: req.params.id, status: req.body.status };
+      const response = createSuccessResponse(
+        result,
+        "Tenant status updated successfully",
+        HttpStatus.OK,
+      );
+      res.status(response.statusCode).json(response.toJSON());
+    },
+  ),
+
+  getAllUsers: asyncHandler(
     async (req: Request, res: Response, next: NextFunction) => {
       const result = [
-        { staffId: "staff-1", name: "Mike Johnson", services: 50, rating: 4.5 },
         {
-          staffId: "staff-2",
-          name: "Sarah Williams",
-          services: 45,
-          rating: 4.8,
+          id: "user-1",
+          name: "John Doe",
+          email: "john@example.com",
+          role: "owner",
+        },
+        {
+          id: "user-2",
+          name: "Jane Smith",
+          email: "jane@example.com",
+          role: "staff",
         },
       ];
       const response = createSuccessResponse(
         result,
-        "Staff performance retrieved successfully",
+        "Users retrieved successfully",
         HttpStatus.OK,
       );
       res.status(response.statusCode).json(response.toJSON());
     },
   ),
 
-  getCustomerSatisfaction: asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => {
-      const result = { averageRating: 4.5, totalReviews: 100 };
-      const response = createSuccessResponse(
-        result,
-        "Customer satisfaction retrieved successfully",
-        HttpStatus.OK,
-      );
-      res.status(response.statusCode).json(response.toJSON());
-    },
-  ),
-
-  getPartsUsage: asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => {
-      const result = [
-        { part: "Oil Filter", quantity: 50, cost: 25000 },
-        { part: "Air Filter", quantity: 30, cost: 9000 },
-      ];
-      const response = createSuccessResponse(
-        result,
-        "Parts usage retrieved successfully",
-        HttpStatus.OK,
-      );
-      res.status(response.statusCode).json(response.toJSON());
-    },
-  ),
-
-  getOwnerExpenses: asyncHandler(
+  suspendUser: asyncHandler(
     async (req: Request, res: Response, next: NextFunction) => {
       const result = {
-        total: 8000,
-        byService: { oilChange: 5000, tireRotation: 3000 },
-        currency: "INR",
+        id: req.params.id,
+        status: "suspended",
+        suspendedAt: new Date().toISOString(),
       };
       const response = createSuccessResponse(
         result,
-        "Owner expenses retrieved successfully",
+        "User suspended successfully",
         HttpStatus.OK,
       );
       res.status(response.statusCode).json(response.toJSON());
     },
   ),
 
-  getOwnerServiceHistory: asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => {
-      const result = [
-        { date: "2024-01-15", service: "Oil Change", cost: 5000 },
-        { date: "2024-02-20", service: "Tire Rotation", cost: 3000 },
-      ];
-      const response = createSuccessResponse(
-        result,
-        "Service history retrieved successfully",
-        HttpStatus.OK,
-      );
-      res.status(response.statusCode).json(response.toJSON());
-    },
-  ),
-
-  getUpcomingServices: asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => {
-      const result = [
-        { service: "Oil Change", dueDate: "2024-04-01", mileage: 55000 },
-      ];
-      const response = createSuccessResponse(
-        result,
-        "Upcoming services retrieved successfully",
-        HttpStatus.OK,
-      );
-      res.status(response.statusCode).json(response.toJSON());
-    },
-  ),
-
-  getMaintenanceSummary: asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => {
-      const result = { scheduled: 5, completed: 10, missed: 2 };
-      const response = createSuccessResponse(
-        result,
-        "Maintenance summary retrieved successfully",
-        HttpStatus.OK,
-      );
-      res.status(response.statusCode).json(response.toJSON());
-    },
-  ),
-
-  getTenantsReport: asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => {
-      const result = { total: 50, active: 45, inactive: 5 };
-      const response = createSuccessResponse(
-        result,
-        "Tenants report retrieved successfully",
-        HttpStatus.OK,
-      );
-      res.status(response.statusCode).json(response.toJSON());
-    },
-  ),
-
-  getSaaSRevenue: asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => {
-      const result = { total: 500000, monthly: 50000, arpu: 1000 };
-      const response = createSuccessResponse(
-        result,
-        "SaaS revenue retrieved successfully",
-        HttpStatus.OK,
-      );
-      res.status(response.statusCode).json(response.toJSON());
-    },
-  ),
-
-  getGrowthMetrics: asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => {
-      const result = { newTenants: 10, churnRate: "2%", growthRate: "15%" };
-      const response = createSuccessResponse(
-        result,
-        "Growth metrics retrieved successfully",
-        HttpStatus.OK,
-      );
-      res.status(response.statusCode).json(response.toJSON());
-    },
-  ),
-
-  getRetentionReport: asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => {
-      const result = { retentionRate: "95%", ltv: 5000 };
-      const response = createSuccessResponse(
-        result,
-        "Retention report retrieved successfully",
-        HttpStatus.OK,
-      );
-      res.status(response.statusCode).json(response.toJSON());
-    },
-  ),
-
-  getChurnReport: asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => {
-      const result = { churnRate: "2%", churnedTenants: 1 };
-      const response = createSuccessResponse(
-        result,
-        "Churn report retrieved successfully",
-        HttpStatus.OK,
-      );
-      res.status(response.statusCode).json(response.toJSON());
-    },
-  ),
-
-  exportReport: asyncHandler(
+  activateUser: asyncHandler(
     async (req: Request, res: Response, next: NextFunction) => {
       const result = {
-        url: "/uploads/reports/export.csv",
-        type: req.body.type,
+        id: req.params.id,
+        status: "active",
+        activatedAt: new Date().toISOString(),
       };
       const response = createSuccessResponse(
         result,
-        "Report exported successfully",
+        "User activated successfully",
+        HttpStatus.OK,
+      );
+      res.status(response.statusCode).json(response.toJSON());
+    },
+  ),
+
+  getSystemHealth: asyncHandler(
+    async (req: Request, res: Response, next: NextFunction) => {
+      const result = {
+        status: "healthy",
+        database: "connected",
+        cache: "connected",
+        api: "operational",
+      };
+      const response = createSuccessResponse(
+        result,
+        "System health retrieved successfully",
+        HttpStatus.OK,
+      );
+      res.status(response.statusCode).json(response.toJSON());
+    },
+  ),
+
+  getSystemLogs: asyncHandler(
+    async (req: Request, res: Response, next: NextFunction) => {
+      const result = [
+        {
+          level: "info",
+          message: "Server started",
+          timestamp: new Date().toISOString(),
+        },
+        {
+          level: "debug",
+          message: "Connection established",
+          timestamp: new Date().toISOString(),
+        },
+      ];
+      const response = createSuccessResponse(
+        result,
+        "Logs retrieved successfully",
+        HttpStatus.OK,
+      );
+      res.status(response.statusCode).json(response.toJSON());
+    },
+  ),
+
+  getSystemMetrics: asyncHandler(
+    async (req: Request, res: Response, next: NextFunction) => {
+      const result = {
+        requests: { total: 10000, failed: 50 },
+        responseTime: { avg: "120ms", p95: "250ms" },
+      };
+      const response = createSuccessResponse(
+        result,
+        "Metrics retrieved successfully",
+        HttpStatus.OK,
+      );
+      res.status(response.statusCode).json(response.toJSON());
+    },
+  ),
+
+  clearCache: asyncHandler(
+    async (req: Request, res: Response, next: NextFunction) => {
+      const response = createSuccessResponse(
+        null,
+        "Cache cleared successfully",
+        HttpStatus.OK,
+      );
+      res.status(response.statusCode).json(response.toJSON());
+    },
+  ),
+
+  reindexSearch: asyncHandler(
+    async (req: Request, res: Response, next: NextFunction) => {
+      const response = createSuccessResponse(
+        null,
+        "Search reindexed successfully",
+        HttpStatus.OK,
+      );
+      res.status(response.statusCode).json(response.toJSON());
+    },
+  ),
+
+  createBackup: asyncHandler(
+    async (req: Request, res: Response, next: NextFunction) => {
+      const result = { id: "backup-1", status: "completed", size: "500MB" };
+      const response = createSuccessResponse(
+        result,
+        "Backup created successfully",
+        HttpStatus.CREATED,
+      );
+      res.status(response.statusCode).json(response.toJSON());
+    },
+  ),
+
+  getAuditLogs: asyncHandler(
+    async (req: Request, res: Response, next: NextFunction) => {
+      const result = [
+        {
+          id: "log-1",
+          action: "USER_CREATED",
+          userId: "user-1",
+          timestamp: new Date().toISOString(),
+        },
+        {
+          id: "log-2",
+          action: "TENANT_UPDATED",
+          userId: "admin-1",
+          timestamp: new Date().toISOString(),
+        },
+      ];
+      const response = createSuccessResponse(
+        result,
+        "Audit logs retrieved successfully",
         HttpStatus.OK,
       );
       res.status(response.statusCode).json(response.toJSON());

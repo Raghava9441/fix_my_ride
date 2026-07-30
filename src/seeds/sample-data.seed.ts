@@ -224,7 +224,7 @@ export const seedSampleData = async (
     }
 
     // Get a staff member for technician
-    const staffAccount = await Account.findOne({
+    let staffAccount = await Account.findOne({
       tenantId,
       primaryRole: "staff",
       isDeleted: false,

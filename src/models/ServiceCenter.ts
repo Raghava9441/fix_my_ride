@@ -1,9 +1,62 @@
 // models/ServiceCenter.js
 
-import mongoose, { Schema } from "mongoose";
+import mongoose, { Schema, Document, Model, Types } from "mongoose";
 import { tenantPlugin } from '../middleware/tenant/tenantPlugin';
 
-const serviceCenterSchema = new Schema({
+export interface IServiceCenter extends Document {
+  tenantId?: Types.ObjectId;
+  name: string;
+  slug?: string;
+  businessRegistrationNumber: string;
+  email: string;
+  phone: string;
+  website?: string;
+  address: {
+    street?: string;
+    city: string;
+    state?: string;
+    country: string;
+    postalCode?: string;
+    coordinates?: {
+      type: string;
+      coordinates: number[];
+    };
+  };
+  subscription: {
+    planId: Types.ObjectId;
+    status: 'trial' | 'active' | 'expired' | 'suspended' | 'cancelled';
+    startedAt: Date;
+    expiresAt?: Date;
+    trialEndsAt?: Date;
+  };
+  settings: {
+    currency: string;
+    timezone: string;
+    businessHours: Record<string, { open?: string; close?: string; closed?: boolean }>;
+  };
+  servicesOffered: Types.DocumentArray<{
+    name?: string;
+    category?: string;
+    duration?: number;
+    basePrice?: number;
+    isActive: boolean;
+  }>;
+  stats: {
+    totalVehiclesServed: number;
+    activeVehicles: number;
+    totalServiceRecords: number;
+    averageRating: number;
+    totalRevenue: number;
+  };
+  createdBy: Types.ObjectId;
+  isDeleted: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface IServiceCenterModel extends Model<IServiceCenter> {}
+
+const serviceCenterSchema = new Schema<IServiceCenter, IServiceCenterModel>({
   // Multi-tenant
   tenantId: {
     type: Schema.Types.ObjectId,
@@ -30,12 +83,12 @@ const serviceCenterSchema = new Schema({
     unique: true,
     sparse: true
   },
-  
+
   // Contact
   email: { type: String, required: true, lowercase: true },
   phone: { type: String, required: true },
   website: String,
-  
+
   // Address
   address: {
     street: String,
@@ -130,4 +183,4 @@ serviceCenterSchema.virtual('vehicles', {
 
 serviceCenterSchema.plugin(tenantPlugin);
 
-export const ServiceCenter = mongoose.model('ServiceCenter', serviceCenterSchema);
+export const ServiceCenter = mongoose.model<IServiceCenter, IServiceCenterModel>('ServiceCenter', serviceCenterSchema);

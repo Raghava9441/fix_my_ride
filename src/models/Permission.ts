@@ -1,10 +1,28 @@
-
-
-import mongoose, { Schema } from "mongoose";
+import mongoose, { Schema, Document, Model } from "mongoose";
 import { tenantPlugin } from '../middleware/tenant/tenantPlugin';
 
+export interface IPermission extends Document {
+    key: string;
+    name: string;
+    description?: string;
+    resource: 'vehicle' | 'service_record' | 'owner_profile' | 'staff_profile' |
+              'service_center' | 'reminder' | 'invitation' | 'report' | 'billing' |
+              'audit_log' | 'role' | 'account' | 'system' | 'permission';
+    action: 'create' | 'read' | 'read_all' | 'update' | 'update_all' | 'delete' |
+            'hard_delete' | 'manage' | 'execute' | 'assign';
+    scope: 'own' | 'center' | 'tenant' | 'global';
+    isActive: boolean;
+    category?: string;
+    requiredPlan: 'free' | 'basic' | 'professional' | 'enterprise';
+    createdAt: Date;
+    updatedAt: Date;
+}
 
-const permissionSchema = new Schema({
+export interface IPermissionModel extends Model<IPermission> {
+    seedDefaults(): Promise<void>;
+}
+
+const permissionSchema = new Schema<IPermission, IPermissionModel>({
     // Unique permission key: resource:action
     key: {
         type: String,
@@ -34,7 +52,8 @@ const permissionSchema = new Schema({
             'audit_log',         // Activity logs
             'role',              // RBAC management
             'account',           // User management
-            'system'             // SaaS admin
+            'system',            // SaaS admin
+            'permission'         // Permission assignment
         ]
     },
 
@@ -76,7 +95,7 @@ const permissionSchema = new Schema({
 }, { timestamps: true });
 
 // Static: Seed default permissions
-permissionSchema.statics.seedDefaults = async function () {
+permissionSchema.statics.seedDefaults = async function (this: IPermissionModel) {
     const defaults = [
         // Vehicle permissions
         { key: 'vehicle:create', name: 'Create Vehicle', resource: 'vehicle', action: 'create', scope: 'own' },
@@ -136,4 +155,4 @@ permissionSchema.statics.seedDefaults = async function () {
 
 permissionSchema.plugin(tenantPlugin);
 
-export const Permission = mongoose.model('Permission', permissionSchema);
+export const Permission = mongoose.model<IPermission, IPermissionModel>('Permission', permissionSchema);

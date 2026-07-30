@@ -164,7 +164,7 @@ export class AuditLogService {
       actorRole: actorRole as any,
       actorEmail,
       action: action as any,
-      entityType,
+      entityType: entityType as any,
       entityId,
       changes,
       ipAddress,

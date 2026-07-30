@@ -1,7 +1,86 @@
 // models/Tenant.ts
-import mongoose, { Schema } from "mongoose";
+import mongoose, { Schema, Document, Model, Types } from "mongoose";
 
-const tenantSchema = new Schema(
+export interface ITenant extends Document {
+  name: string;
+  slug: string;
+  description?: string;
+  logoUrl?: string;
+  website?: string;
+  contactEmail: string;
+  contactPhone?: string;
+  address?: {
+    street?: string;
+    city?: string;
+    state?: string;
+    country: string;
+    postalCode?: string;
+    timezone: string;
+    currency: "USD" | "EUR" | "GBP" | "INR" | "AED";
+  };
+  subscription: {
+    planId?: Types.ObjectId;
+    status: "trial" | "active" | "expired" | "suspended" | "cancelled";
+    startedAt: Date;
+    expiresAt?: Date;
+    trialEndsAt?: Date;
+    paymentMethodId?: string;
+  };
+  limits: {
+    maxVehicles: number;
+    maxStaff: number;
+    maxServiceCenters: number;
+    maxStorageGB: number;
+    maxApiCallsPerMonth: number;
+  };
+  features: string[];
+  settings: {
+    enableMfa: boolean;
+    requireEmailVerification: boolean;
+    allowSignups: boolean;
+    sessionTimeoutMinutes: number;
+    passwordPolicy: {
+      minLength: number;
+      requireUppercase: boolean;
+      requireLowercase: boolean;
+      requireNumbers: boolean;
+      requireSpecialChars: boolean;
+    };
+  };
+  billing?: {
+    companyName?: string;
+    taxId?: string;
+    billingEmail?: string;
+    billingAddress?: {
+      street?: string;
+      city?: string;
+      state?: string;
+      country?: string;
+      postalCode?: string;
+    };
+  };
+  stats: {
+    totalUsers: number;
+    totalVehicles: number;
+    totalServiceRecords: number;
+    totalRevenue: number;
+  };
+  ownerId?: Types.ObjectId;
+  isActive: boolean;
+  isDeleted: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+
+  isWithinLimits(resourceType: string, currentCount: number): boolean;
+  canAccessFeature(featureName: string): boolean;
+}
+
+export interface ITenantModel extends Model<ITenant> {
+  findBySlug(slug: string): mongoose.Query<ITenant | null, ITenant>;
+  findActive(): mongoose.Query<ITenant[], ITenant>;
+}
+
+const tenantSchema = new Schema<ITenant, ITenantModel>(
   {
     // Identity
     name: {
@@ -132,6 +211,7 @@ tenantSchema.virtual("vehicles", {
 
 // Methods
 tenantSchema.methods.isWithinLimits = function (
+  this: ITenant,
   resourceType: string,
   currentCount: number,
 ): boolean {
@@ -146,6 +226,7 @@ tenantSchema.methods.isWithinLimits = function (
 };
 
 tenantSchema.methods.canAccessFeature = function (
+  this: ITenant,
   featureName: string,
 ): boolean {
   if (this.features.includes("all")) return true;
@@ -153,19 +234,19 @@ tenantSchema.methods.canAccessFeature = function (
 };
 
 // Static methods
-tenantSchema.statics.findBySlug = function (slug: string) {
+tenantSchema.statics.findBySlug = function (this: ITenantModel, slug: string) {
   return this.findOne({ slug, isDeleted: false, isActive: true });
 };
 
-tenantSchema.statics.findActive = function () {
+tenantSchema.statics.findActive = function (this: ITenantModel) {
   return this.find({ isDeleted: false, isActive: true });
 };
 
 // Pre-save: Sync limits from subscription plan
-tenantSchema.pre("save", async function (next) {
+tenantSchema.pre("save", async function (this: ITenant, next) {
   if (this.subscription?.planId && !this.isDeleted) {
     const SubscriptionPlan = mongoose.model("SubscriptionPlan");
-    const plan = await SubscriptionPlan.findById(this.subscription.planId);
+    const plan: any = await SubscriptionPlan.findById(this.subscription.planId);
     if (plan) {
       this.limits.maxVehicles = plan.limits.maxVehicles ?? 0;
       this.limits.maxStaff = plan.limits.maxStaff ?? 0;
@@ -173,11 +254,11 @@ tenantSchema.pre("save", async function (next) {
       this.limits.maxStorageGB = plan.limits.maxStorageGB ?? 0;
       this.limits.maxApiCallsPerMonth = plan.limits.maxApiCallsPerMonth ?? 0;
       this.features = (plan.features || [])
-        .filter((f) => f.included)
-        .map((f) => f.name);
+        .filter((f: any) => f.included)
+        .map((f: any) => f.name);
     }
   }
   next();
 });
 
-export const Tenant = mongoose.model("Tenant", tenantSchema);
+export const Tenant = mongoose.model<ITenant, ITenantModel>("Tenant", tenantSchema);

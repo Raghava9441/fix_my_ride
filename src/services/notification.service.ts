@@ -22,6 +22,7 @@ export interface CreateNotificationInput {
   priority?: "low" | "medium" | "high" | "urgent";
   templateId?: string;
   provider?: string;
+  status?: "pending" | "queued" | "sent" | "delivered" | "failed" | "read" | "clicked" | "cancelled";
 }
 
 export interface NotificationFilters {
@@ -111,7 +112,7 @@ export class NotificationService {
       type: input.type,
       data: input.data || {},
       priority: input.priority || "medium",
-      status: "pending",
+      status: input.status || "pending",
       templateId: input.templateId,
       provider: input.provider || "internal",
       isDeleted: false,

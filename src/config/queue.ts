@@ -58,11 +58,11 @@ export const addJob = async (
   const jobData = {
     id: jobId,
     type: job.type,
-    data: job.data,
-    progress: 0,
-    attemptsMade: 0,
-    createdAt: Date.now(),
-    processedAt: null,
+    data: JSON.stringify(job.data),
+    progress: "0",
+    attemptsMade: "0",
+    createdAt: String(Date.now()),
+    processedAt: "",
   };
 
   const jobKey = getJobKey(queueName, jobId);
@@ -80,7 +80,12 @@ export const getJob = async (
   const redis = getRedisClient();
   const jobKey = getJobKey(queueName, jobId);
   const job = await redis.hgetall(jobKey);
-  return Object.keys(job).length > 0 ? job : null;
+  if (Object.keys(job).length === 0) return null;
+  return {
+    id: job.id,
+    type: job.type,
+    data: job.data ? JSON.parse(job.data) : {},
+  };
 };
 
 export const getWaitingJobs = async (

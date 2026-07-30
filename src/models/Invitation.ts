@@ -69,7 +69,28 @@ export interface IInvitation extends Document {
   sendReminder(): Promise<boolean>;
 }
 
-const invitationSchema = new Schema<IInvitation>({
+export interface IInvitationModel extends mongoose.Model<IInvitation> {
+  findValidByToken(token: string): mongoose.Query<IInvitation | null, IInvitation>;
+  findPendingByEmail(email: string): mongoose.Query<IInvitation[], IInvitation>;
+  createVehicleAccess(data: {
+    tenantId?: mongoose.Types.ObjectId;
+    inviterId: mongoose.Types.ObjectId;
+    inviterName?: string;
+    email?: string;
+    phone?: string;
+    name?: string;
+    vehicleId: mongoose.Types.ObjectId;
+    serviceCenterId: mongoose.Types.ObjectId;
+    role?: string;
+    accessLevel?: string;
+    permissions?: string[];
+    message?: string;
+    maxUses?: number;
+    expiresAt?: Date;
+  }): Promise<IInvitation>;
+}
+
+const invitationSchema = new Schema<IInvitation, IInvitationModel>({
   tenantId: {
     type: Schema.Types.ObjectId,
     ref: 'Tenant',
@@ -301,7 +322,7 @@ invitationSchema.methods.sendReminder = async function(): Promise<boolean> {
 };
 
 // Static methods
-invitationSchema.statics.findValidByToken = function(token: string) {
+invitationSchema.statics.findValidByToken = function(this: IInvitationModel, token: string) {
   return this.findOne({
     token,
     status: 'pending',
@@ -309,7 +330,7 @@ invitationSchema.statics.findValidByToken = function(token: string) {
   }).populate('vehicleId serviceCenterId inviterId');
 };
 
-invitationSchema.statics.findPendingByEmail = function(email: string) {
+invitationSchema.statics.findPendingByEmail = function(this: IInvitationModel, email: string) {
   return this.find({
     inviteeEmail: email.toLowerCase(),
     status: 'pending',
@@ -317,7 +338,7 @@ invitationSchema.statics.findPendingByEmail = function(email: string) {
   }).populate('vehicleId serviceCenterId');
 };
 
-invitationSchema.statics.createVehicleAccess = async function(data: {
+invitationSchema.statics.createVehicleAccess = async function(this: IInvitationModel, data: {
   tenantId?: mongoose.Types.ObjectId;
   inviterId: mongoose.Types.ObjectId;
   inviterName?: string;
@@ -356,4 +377,4 @@ invitationSchema.statics.createVehicleAccess = async function(data: {
 
 invitationSchema.plugin(tenantPlugin);
 
-export const Invitation = mongoose.model<IInvitation>('Invitation', invitationSchema);
+export const Invitation = mongoose.model<IInvitation, IInvitationModel>('Invitation', invitationSchema);

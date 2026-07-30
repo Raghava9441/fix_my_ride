@@ -1,5 +1,5 @@
 // models/OdometerReading.ts
-import mongoose, { Schema, Document } from 'mongoose';
+import mongoose, { Schema, Document, Model } from 'mongoose';
 import { tenantPlugin } from '../middleware/tenant/tenantPlugin';
 
 export interface IOdometerReading extends Document {
@@ -18,7 +18,15 @@ export interface IOdometerReading extends Document {
   isDeleted: boolean;
 }
 
-const odometerReadingSchema = new Schema<IOdometerReading>({
+export interface IOdometerReadingModel extends Model<IOdometerReading> {
+  getLatestForVehicle(vehicleId: string): mongoose.Query<IOdometerReading | null, IOdometerReading>;
+  getHistory(
+    vehicleId: string,
+    options?: { limit?: number; from?: Date; to?: Date },
+  ): mongoose.Query<IOdometerReading[], IOdometerReading>;
+}
+
+const odometerReadingSchema = new Schema<IOdometerReading, IOdometerReadingModel>({
   tenantId: {
     type: Schema.Types.ObjectId,
     ref: 'Tenant',
@@ -94,12 +102,13 @@ odometerReadingSchema.index({ vehicleId: 1, recordedAt: -1 });
 odometerReadingSchema.index({ vehicleId: 1, value: -1 });
 
 // Static methods
-odometerReadingSchema.statics.getLatestForVehicle = function(vehicleId: string) {
+odometerReadingSchema.statics.getLatestForVehicle = function(this: IOdometerReadingModel, vehicleId: string) {
   return this.findOne({ vehicleId, isDeleted: false })
     .sort({ recordedAt: -1 });
 };
 
 odometerReadingSchema.statics.getHistory = function(
+  this: IOdometerReadingModel,
   vehicleId: string,
   options: { limit?: number; from?: Date; to?: Date } = {}
 ) {
@@ -118,4 +127,4 @@ odometerReadingSchema.statics.getHistory = function(
 
 odometerReadingSchema.plugin(tenantPlugin);
 
-export const OdometerReading = mongoose.model<IOdometerReading>('OdometerReading', odometerReadingSchema);
+export const OdometerReading = mongoose.model<IOdometerReading, IOdometerReadingModel>('OdometerReading', odometerReadingSchema);

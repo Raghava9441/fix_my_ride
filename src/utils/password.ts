@@ -27,7 +27,7 @@ export async function verifyPassword(
  * Check if password needs rehashing (based on salt rounds)
  */
 export async function needsRehash(hash: string): Promise<boolean> {
-  return bcrypt.getSaltRounds(hash) < SALT_ROUNDS;
+  return bcrypt.getRounds(hash) < SALT_ROUNDS;
 }
 
 /**

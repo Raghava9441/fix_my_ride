@@ -234,7 +234,7 @@ export class StaffProfileService {
     }
 
     const existing = staff.customPermissions.find(
-      (p) => p.permission.toString() === permissionId,
+      (p) => p.permission?.toString() === permissionId,
     );
 
     if (existing) {
@@ -259,9 +259,10 @@ export class StaffProfileService {
       throw new Error("Staff profile not found");
     }
 
-    staff.customPermissions = staff.customPermissions.filter(
-      (p) => p.permission.toString() !== permissionId,
+    const remainingPermissions = staff.customPermissions.filter(
+      (p) => p.permission?.toString() !== permissionId,
     );
+    staff.customPermissions.splice(0, staff.customPermissions.length, ...remainingPermissions);
 
     await staff.save();
     return staff;
@@ -279,7 +280,7 @@ export class StaffProfileService {
     }
 
     const existing = staff.deniedPermissions.find(
-      (p) => p.permission.toString() === permissionId,
+      (p) => p.permission?.toString() === permissionId,
     );
 
     if (existing) {

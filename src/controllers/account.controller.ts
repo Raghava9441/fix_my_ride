@@ -1,4 +1,5 @@
 import { Request, Response } from "express";
+import { ValidatedRequest } from "../middleware/validation.middleware";
 import {
   AccountService,
   CreateAccountInput,
@@ -54,7 +55,7 @@ export class AccountController {
     return res.status(response.statusCode).json(response.toJSON());
   }
 
-  async create(req: Request, res: Response) {
+  async create(req: ValidatedRequest<any>, res: Response) {
     const data = req.validated;
 
     const existingAccount = await this.accountService.findByEmail(data.email);
@@ -89,7 +90,7 @@ export class AccountController {
     return res.status(response.statusCode).json(response.toJSON());
   }
 
-  async update(req: Request, res: Response) {
+  async update(req: ValidatedRequest<any>, res: Response) {
     const { id } = req.params;
     const data = req.validated;
 
@@ -137,7 +138,7 @@ export class AccountController {
     return res.status(response.statusCode).json(response.toJSON());
   }
 
-  async updateStatus(req: Request, res: Response) {
+  async updateStatus(req: ValidatedRequest<any>, res: Response) {
     const { id } = req.params;
     const { status, suspensionReason } = req.validated;
 
@@ -165,7 +166,7 @@ export class AccountController {
     return res.status(response.statusCode).json(response.toJSON());
   }
 
-  async assignRole(req: Request, res: Response) {
+  async assignRole(req: ValidatedRequest<any>, res: Response) {
     const { id } = req.params;
     const { roleId, profileId } = req.validated;
 
@@ -252,7 +253,7 @@ export class AccountController {
     }
   }
 
-  async switchRole(req: Request, res: Response) {
+  async switchRole(req: ValidatedRequest<any>, res: Response) {
     const { accountId, roleId } = req.validated;
 
     try {

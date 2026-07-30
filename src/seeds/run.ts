@@ -57,6 +57,9 @@ const main = async () => {
 
     if (force) {
       console.log("⚠️  FORCE MODE: Dropping all collections...");
+      if (!mongoose.connection.db) {
+        throw new Error("Database connection not initialized");
+      }
       const collections = await mongoose.connection.db.collections();
       for (const coll of collections) {
         await coll.drop();

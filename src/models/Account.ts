@@ -1,5 +1,5 @@
 // models/Account.ts
-import mongoose, { Schema, Document } from 'mongoose';
+import mongoose, { Schema, Document, Model } from 'mongoose';
 import bcrypt from 'bcryptjs';
 import crypto from 'node:crypto';    
 import { tenantPlugin } from '../middleware/tenant/tenantPlugin';
@@ -59,7 +59,12 @@ export interface IAccount extends Document {
   softDelete(): Promise<IAccount>;
 }
 
-const accountSchema = new Schema<IAccount>({
+export interface IAccountModel extends Model<IAccount> {
+  findByEmail(email: string, includeDeleted?: boolean): mongoose.Query<IAccount | null, IAccount>;
+  findActive(filter?: Record<string, any>): mongoose.Query<IAccount[], IAccount>;
+}
+
+const accountSchema = new Schema<IAccount, IAccountModel>({
   email: {
     type: String,
     required: [true, 'Email is required'],
@@ -338,13 +343,13 @@ accountSchema.methods.softDelete = async function(): Promise<IAccount> {
 };
 
 // Static methods
-accountSchema.statics.findByEmail = function(email: string, includeDeleted = false) {
+accountSchema.statics.findByEmail = function(this: IAccountModel, email: string, includeDeleted = false) {
   const query: any = { email: email.toLowerCase() };
   if (!includeDeleted) query.isDeleted = false;
   return this.findOne(query);
 };
 
-accountSchema.statics.findActive = function(filter = {}) {
+accountSchema.statics.findActive = function(this: IAccountModel, filter: Record<string, any> = {}) {
   return this.find({
     ...filter,
     isDeleted: false,
@@ -358,4 +363,4 @@ accountSchema.statics.findActive = function(filter = {}) {
 
 accountSchema.plugin(tenantPlugin);
 
-export const Account = mongoose.model<IAccount>('Account', accountSchema);
+export const Account = mongoose.model<IAccount, IAccountModel>('Account', accountSchema);

@@ -3,6 +3,7 @@ import { Account } from "../models/Account";
 import { Tenant } from "../models/Tenant";
 import { OwnerProfile } from "../models/OwnerProfile";
 import { Role } from "../models/Role";
+import { SubscriptionPlan } from "../models/SubscriptionPlan";
 import bcrypt from "bcryptjs";
 import mongoose from "mongoose";
 

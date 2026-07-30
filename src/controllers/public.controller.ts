@@ -1,216 +1,191 @@
 import { Request, Response, NextFunction } from "express";
 import { asyncHandler, createSuccessResponse, HttpStatus } from "../utils";
 
-export const ownerController = {
-  getAllOwners: asyncHandler(
+export const publicController = {
+  healthCheck: asyncHandler(
     async (req: Request, res: Response, next: NextFunction) => {
-      const result = [
-        { id: "owner-1", name: "John Doe", email: "john@example.com" },
-        { id: "owner-2", name: "Jane Smith", email: "jane@example.com" },
-      ];
+      const result = { status: "healthy", timestamp: new Date().toISOString() };
       const response = createSuccessResponse(
         result,
-        "Owners retrieved successfully",
+        "Service is healthy",
         HttpStatus.OK,
       );
       res.status(response.statusCode).json(response.toJSON());
     },
   ),
 
-  getOwnerById: asyncHandler(
+  detailedHealthCheck: asyncHandler(
+    async (req: Request, res: Response, next: NextFunction) => {
+      const result = {
+        status: "healthy",
+        database: "connected",
+        cache: "connected",
+        uptime: "30 days",
+      };
+      const response = createSuccessResponse(
+        result,
+        "Detailed health check",
+        HttpStatus.OK,
+      );
+      res.status(response.statusCode).json(response.toJSON());
+    },
+  ),
+
+  getSystemInfo: asyncHandler(
+    async (req: Request, res: Response, next: NextFunction) => {
+      const result = {
+        name: "FixMyRide",
+        environment: "production",
+        region: "India",
+      };
+      const response = createSuccessResponse(
+        result,
+        "System info retrieved successfully",
+        HttpStatus.OK,
+      );
+      res.status(response.statusCode).json(response.toJSON());
+    },
+  ),
+
+  getVersion: asyncHandler(
+    async (req: Request, res: Response, next: NextFunction) => {
+      const result = { version: "1.0.0", build: "2024.01.01" };
+      const response = createSuccessResponse(
+        result,
+        "Version info retrieved",
+        HttpStatus.OK,
+      );
+      res.status(response.statusCode).json(response.toJSON());
+    },
+  ),
+
+  getPublicServiceCenters: asyncHandler(
+    async (req: Request, res: Response, next: NextFunction) => {
+      const result = [
+        {
+          id: "center-1",
+          name: "Quick Fix Auto",
+          address: "123 Main St",
+          rating: 4.5,
+        },
+        {
+          id: "center-2",
+          name: "Premium Motors",
+          address: "456 Oak Ave",
+          rating: 4.8,
+        },
+      ];
+      const response = createSuccessResponse(
+        result,
+        "Service centers retrieved successfully",
+        HttpStatus.OK,
+      );
+      res.status(response.statusCode).json(response.toJSON());
+    },
+  ),
+
+  getPublicServiceCenter: asyncHandler(
     async (req: Request, res: Response, next: NextFunction) => {
       const result = {
         id: req.params.id,
-        name: "John Doe",
-        email: "john@example.com",
+        name: "Quick Fix Auto",
+        address: "123 Main St",
         phone: "+1234567890",
+        rating: 4.5,
+        verified: true,
       };
       const response = createSuccessResponse(
         result,
-        "Owner retrieved successfully",
+        "Service center retrieved successfully",
         HttpStatus.OK,
       );
       res.status(response.statusCode).json(response.toJSON());
     },
   ),
 
-  updateOwner: asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => {
-      const result = { id: req.params.id, ...req.body };
-      const response = createSuccessResponse(
-        result,
-        "Owner updated successfully",
-        HttpStatus.OK,
-      );
-      res.status(response.statusCode).json(response.toJSON());
-    },
-  ),
-
-  deleteOwner: asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => {
-      const result = {
-        id: req.params.id,
-        deleted: true,
-        deletedAt: new Date().toISOString(),
-      };
-      const response = createSuccessResponse(
-        result,
-        "Owner deleted successfully",
-        HttpStatus.OK,
-      );
-      res.status(response.statusCode).json(response.toJSON());
-    },
-  ),
-
-  getOwnerVehicles: asyncHandler(
+  getPublicReviews: asyncHandler(
     async (req: Request, res: Response, next: NextFunction) => {
       const result = [
         {
-          id: "vehicle-1",
-          registrationNumber: "ABC-1234",
-          make: "Toyota",
-          model: "Camry",
+          id: "review-1",
+          rating: 5,
+          comment: "Great service!",
+          date: "2024-01-15",
         },
         {
-          id: "vehicle-2",
-          registrationNumber: "XYZ-5678",
-          make: "Honda",
-          model: "Civic",
+          id: "review-2",
+          rating: 4,
+          comment: "Good experience",
+          date: "2024-02-01",
         },
       ];
       const response = createSuccessResponse(
         result,
-        "Vehicles retrieved successfully",
+        "Reviews retrieved successfully",
         HttpStatus.OK,
       );
       res.status(response.statusCode).json(response.toJSON());
     },
   ),
 
-  addVehicleToOwner: asyncHandler(
+  submitContactForm: asyncHandler(
     async (req: Request, res: Response, next: NextFunction) => {
       const result = {
-        id: "new-vehicle-id",
+        id: "contact-new",
         ...req.body,
-        ownerId: req.params.id,
+        submittedAt: new Date().toISOString(),
       };
       const response = createSuccessResponse(
         result,
-        "Vehicle added successfully",
+        "Contact form submitted successfully",
         HttpStatus.CREATED,
       );
       res.status(response.statusCode).json(response.toJSON());
     },
   ),
 
-  getServiceHistory: asyncHandler(
+  subscribeNewsletter: asyncHandler(
     async (req: Request, res: Response, next: NextFunction) => {
-      const result = [
-        {
-          id: "record-1",
-          serviceDate: "2024-01-15",
-          serviceType: "oil-change",
-          cost: 5000,
-        },
-        {
-          id: "record-2",
-          serviceDate: "2024-02-20",
-          serviceType: "tire-rotation",
-          cost: 3000,
-        },
-      ];
+      const result = { email: req.body.email, subscribed: true };
       const response = createSuccessResponse(
         result,
-        "Service history retrieved successfully",
+        "Subscribed to newsletter successfully",
         HttpStatus.OK,
       );
       res.status(response.statusCode).json(response.toJSON());
     },
   ),
 
-  getExpenses: asyncHandler(
+  unsubscribeNewsletter: asyncHandler(
     async (req: Request, res: Response, next: NextFunction) => {
-      const result = {
-        total: 8000,
-        currency: "INR",
-        breakdown: { oilChange: 5000, tireRotation: 3000 },
-      };
+      const result = { email: req.body.email, subscribed: false };
       const response = createSuccessResponse(
         result,
-        "Expenses retrieved successfully",
+        "Unsubscribed from newsletter successfully",
         HttpStatus.OK,
       );
       res.status(response.statusCode).json(response.toJSON());
     },
   ),
 
-  getNotifications: asyncHandler(
+  requestDemo: asyncHandler(
     async (req: Request, res: Response, next: NextFunction) => {
-      const result = [
-        {
-          id: "notif-1",
-          title: "Service Due",
-          message: "Your vehicle needs service",
-          read: false,
-        },
-        {
-          id: "notif-2",
-          title: "Reminder",
-          message: "Insurance renewal",
-          read: true,
-        },
-      ];
+      const result = { id: "demo-new", ...req.body, status: "pending" };
       const response = createSuccessResponse(
         result,
-        "Notifications retrieved successfully",
-        HttpStatus.OK,
+        "Demo request submitted successfully",
+        HttpStatus.CREATED,
       );
       res.status(response.statusCode).json(response.toJSON());
     },
   ),
 
-  markNotificationRead: asyncHandler(
+  getOnboardingStatus: asyncHandler(
     async (req: Request, res: Response, next: NextFunction) => {
-      const result = { id: req.params.notificationId, read: true };
+      const result = { step: 1, progress: "25%" };
       const response = createSuccessResponse(
         result,
-        "Notification marked as read",
-        HttpStatus.OK,
-      );
-      res.status(response.statusCode).json(response.toJSON());
-    },
-  ),
-
-  deleteNotifications: asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => {
-      const result = { deleted: true, count: 2 };
-      const response = createSuccessResponse(
-        result,
-        "Notifications deleted successfully",
-        HttpStatus.OK,
-      );
-      res.status(response.statusCode).json(response.toJSON());
-    },
-  ),
-
-  getPreferences: asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => {
-      const result = { language: "en", notifications: true, theme: "light" };
-      const response = createSuccessResponse(
-        result,
-        "Preferences retrieved successfully",
-        HttpStatus.OK,
-      );
-      res.status(response.statusCode).json(response.toJSON());
-    },
-  ),
-
-  updatePreferences: asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => {
-      const result = { id: req.params.id, ...req.body };
-      const response = createSuccessResponse(
-        result,
-        "Preferences updated successfully",
+        "Onboarding status retrieved",
         HttpStatus.OK,
       );
       res.status(response.statusCode).json(response.toJSON());

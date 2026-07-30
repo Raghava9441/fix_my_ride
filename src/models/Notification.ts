@@ -1,8 +1,76 @@
 // server/models/Notification.js
-import mongoose from 'mongoose';
+import mongoose, { Schema, Document, Model, Types } from 'mongoose';
 import { tenantPlugin } from '../middleware/tenant/tenantPlugin';
 
-const notificationSchema = new mongoose.Schema({
+export interface INotification extends Document {
+    recipientId: Types.ObjectId;
+    recipientModel: 'Owner' | 'User' | 'ServiceCenter';
+    title: string;
+    content: string;
+    channel: 'email' | 'sms' | 'push' | 'in_app';
+    type: string;
+    data?: Record<string, any>;
+    status: 'pending' | 'queued' | 'sent' | 'delivered' | 'failed' | 'read' | 'clicked' | 'cancelled';
+    sentAt?: Date;
+    deliveredAt?: Date;
+    readAt?: Date;
+    clickedAt?: Date;
+    retryCount: number;
+    lastRetryAt?: Date;
+    nextRetryAt?: Date;
+    failureReason?: string;
+    priority: 'low' | 'medium' | 'high' | 'urgent';
+    expiresAt?: Date;
+    templateId?: string;
+    templateVersion?: number;
+    messageId?: string;
+    provider?: string;
+    metadata?: Record<string, any>;
+    batchId?: string;
+    isBulk: boolean;
+    readReceiptRequested: boolean;
+    isDeleted: boolean;
+    deletedAt?: Date;
+    deletedReason?: string;
+    createdAt: Date;
+    updatedAt: Date;
+
+    markAsSent(providerMessageId?: string): Promise<INotification>;
+    markAsDelivered(): Promise<INotification>;
+    markAsRead(): Promise<INotification>;
+    markAsClicked(): Promise<INotification>;
+    markAsFailed(reason?: string): Promise<INotification>;
+    cancel(reason?: string): Promise<INotification>;
+    getRecipientModel(): Promise<any>;
+}
+
+export interface INotificationModel extends Model<INotification> {
+    findByRecipient(
+        recipientId: string | Types.ObjectId,
+        recipientModel: string,
+        options?: any,
+    ): mongoose.Query<INotification[], INotification>;
+    findUnreadByRecipient(
+        recipientId: string | Types.ObjectId,
+        recipientModel: string,
+    ): mongoose.Query<INotification[], INotification>;
+    markAllAsRead(
+        recipientId: string | Types.ObjectId,
+        recipientModel: string,
+    ): Promise<any>;
+    deleteOldNotifications(daysToKeep?: number): Promise<any>;
+    getNotificationStats(
+        recipientId: string | Types.ObjectId,
+        recipientModel: string,
+    ): Promise<any[]>;
+    createFromTemplate(
+        template: any,
+        recipient: { id: string; model: string },
+        data: Record<string, any>,
+    ): Promise<INotification>;
+}
+
+const notificationSchema = new Schema<INotification, INotificationModel>({
     // Recipient Information
     recipientId: {
         type: mongoose.Schema.Types.ObjectId,
@@ -245,9 +313,9 @@ notificationSchema.index({ 'data.vehicleId': 1, type: 1 });
 notificationSchema.index({ 'data.serviceCenterId': 1, createdAt: -1 });
 
 // Virtual for age
-notificationSchema.virtual('age').get(function () {
+notificationSchema.virtual('age').get(function (this: INotification) {
     const now = new Date();
-    const diffMs = now - this.createdAt;
+    const diffMs = now.getTime() - this.createdAt.getTime();
     const diffMins = Math.floor(diffMs / 60000);
     const diffHours = Math.floor(diffMs / 3600000);
     const diffDays = Math.floor(diffMs / 86400000);
@@ -258,12 +326,12 @@ notificationSchema.virtual('age').get(function () {
 });
 
 // Virtual for isExpired
-notificationSchema.virtual('isExpired').get(function () {
+notificationSchema.virtual('isExpired').get(function (this: INotification) {
     return this.expiresAt && this.expiresAt < new Date();
 });
 
 // Virtual for isRead
-notificationSchema.virtual('isRead').get(function () {
+notificationSchema.virtual('isRead').get(function (this: INotification) {
     return this.status === 'read';
 });
 
@@ -306,20 +374,20 @@ notificationSchema.pre('save', function (next) {
 });
 
 // Methods
-notificationSchema.methods.markAsSent = async function (providerMessageId) {
+notificationSchema.methods.markAsSent = async function (this: INotification, providerMessageId?: string) {
     this.status = 'sent';
     this.sentAt = new Date();
     if (providerMessageId) this.messageId = providerMessageId;
     return this.save();
 };
 
-notificationSchema.methods.markAsDelivered = async function () {
+notificationSchema.methods.markAsDelivered = async function (this: INotification) {
     this.status = 'delivered';
     this.deliveredAt = new Date();
     return this.save();
 };
 
-notificationSchema.methods.markAsRead = async function () {
+notificationSchema.methods.markAsRead = async function (this: INotification) {
     if (this.status !== 'read') {
         this.status = 'read';
         this.readAt = new Date();
@@ -328,12 +396,12 @@ notificationSchema.methods.markAsRead = async function () {
     return this;
 };
 
-notificationSchema.methods.markAsClicked = async function () {
+notificationSchema.methods.markAsClicked = async function (this: INotification) {
     this.clickedAt = new Date();
     return this.save();
 };
 
-notificationSchema.methods.markAsFailed = async function (reason) {
+notificationSchema.methods.markAsFailed = async function (this: INotification, reason?: string) {
     this.status = 'failed';
     this.failureReason = reason;
 
@@ -351,18 +419,23 @@ notificationSchema.methods.markAsFailed = async function (reason) {
     return this.save();
 };
 
-notificationSchema.methods.cancel = async function (reason) {
+notificationSchema.methods.cancel = async function (this: INotification, reason?: string) {
     this.status = 'cancelled';
     this.failureReason = reason;
     return this.save();
 };
 
-notificationSchema.methods.getRecipientModel = async function () {
+notificationSchema.methods.getRecipientModel = async function (this: INotification) {
     return mongoose.model(this.recipientModel).findById(this.recipientId);
 };
 
 // Static methods
-notificationSchema.statics.findByRecipient = function (recipientId, recipientModel, options = {}) {
+notificationSchema.statics.findByRecipient = function (
+    this: INotificationModel,
+    recipientId: string | Types.ObjectId,
+    recipientModel: string,
+    options: any = {},
+) {
     const query = this.find({
         recipientId,
         recipientModel,
@@ -371,15 +444,19 @@ notificationSchema.statics.findByRecipient = function (recipientId, recipientMod
 
     if (options.limit) query.limit(options.limit);
     if (options.skip) query.skip(options.skip);
-    if (options.status) query.where('status').in(options.status);
-    if (options.type) query.where('type').in(options.type);
+    if (options.status) query.where('status').in([].concat(options.status));
+    if (options.type) query.where('type').in([].concat(options.type));
     if (options.channel) query.where('channel').equals(options.channel);
     if (options.unreadOnly) query.where('status').ne('read');
 
     return query;
 };
 
-notificationSchema.statics.findUnreadByRecipient = function (recipientId, recipientModel) {
+notificationSchema.statics.findUnreadByRecipient = function (
+    this: INotificationModel,
+    recipientId: string | Types.ObjectId,
+    recipientModel: string,
+) {
     return this.find({
         recipientId,
         recipientModel,
@@ -389,7 +466,11 @@ notificationSchema.statics.findUnreadByRecipient = function (recipientId, recipi
     }).sort({ priority: -1, createdAt: -1 });
 };
 
-notificationSchema.statics.markAllAsRead = async function (recipientId, recipientModel) {
+notificationSchema.statics.markAllAsRead = async function (
+    this: INotificationModel,
+    recipientId: string | Types.ObjectId,
+    recipientModel: string,
+) {
     return this.updateMany(
         {
             recipientId,
@@ -404,7 +485,7 @@ notificationSchema.statics.markAllAsRead = async function (recipientId, recipien
     );
 };
 
-notificationSchema.statics.deleteOldNotifications = async function (daysToKeep = 90) {
+notificationSchema.statics.deleteOldNotifications = async function (this: INotificationModel, daysToKeep = 90) {
     const cutoffDate = new Date();
     cutoffDate.setDate(cutoffDate.getDate() - daysToKeep);
 
@@ -421,11 +502,15 @@ notificationSchema.statics.deleteOldNotifications = async function (daysToKeep =
     );
 };
 
-notificationSchema.statics.getNotificationStats = async function (recipientId, recipientModel) {
+notificationSchema.statics.getNotificationStats = async function (
+    this: INotificationModel,
+    recipientId: string | Types.ObjectId,
+    recipientModel: string,
+) {
     return this.aggregate([
         {
             $match: {
-                recipientId: mongoose.Types.ObjectId(recipientId),
+                recipientId: new mongoose.Types.ObjectId(recipientId as any),
                 recipientModel,
                 isDeleted: false
             }
@@ -439,7 +524,12 @@ notificationSchema.statics.getNotificationStats = async function (recipientId, r
     ]);
 };
 
-notificationSchema.statics.createFromTemplate = async function (template, recipient, data) {
+notificationSchema.statics.createFromTemplate = async function (
+    this: INotificationModel,
+    template: any,
+    recipient: { id: string; model: string },
+    data: Record<string, any>,
+) {
     // Replace template variables
     let content = template.content;
     let title = template.title;
@@ -465,17 +555,14 @@ notificationSchema.statics.createFromTemplate = async function (template, recipi
 };
 
 // Pre-query middleware to exclude soft-deleted and expired
-notificationSchema.pre(/^find/, function () {
-    if (!this._conditions.hasOwnProperty('isDeleted')) {
+notificationSchema.pre(/^find/, function (this: mongoose.Query<any, any>) {
+    const filter = this.getFilter();
+    if (!Object.prototype.hasOwnProperty.call(filter, 'isDeleted')) {
         this.where({ isDeleted: false });
     }
     this.where({ expiresAt: { $gt: new Date() } });
 });
 
-// TTL index for auto-deletion after expiry (MongoDB will delete these)
-notificationSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
-
 notificationSchema.plugin(tenantPlugin);
 
-const Notification = mongoose.model('Notification', notificationSchema);
-module.exports = Notification;
+export const Notification = mongoose.model<INotification, INotificationModel>('Notification', notificationSchema);

@@ -64,9 +64,23 @@ export interface IDocument extends mongoose.Document {
   deletedAt?: Date;
   deletedBy?: mongoose.Types.ObjectId;
   isDeleted: boolean;
+
+  verify(verifiedBy: string): Promise<IDocument>;
+  archive(): Promise<IDocument>;
+  softDelete(deletedBy: string): Promise<IDocument>;
+  isAccessibleBy(accountId: string, role: string): boolean;
 }
 
-const documentSchema = new Schema<IDocument>({
+export interface IDocumentModel extends mongoose.Model<IDocument> {
+  findByEntity(
+    entityType: string,
+    entityId: string,
+    options?: { type?: string; includeDeleted?: boolean },
+  ): mongoose.Query<IDocument[], IDocument>;
+  findExpiringSoon(days?: number): mongoose.Query<IDocument[], IDocument>;
+}
+
+const documentSchema = new Schema<IDocument, IDocumentModel>({
   tenantId: {
     type: Schema.Types.ObjectId,
     ref: 'Tenant',
@@ -220,19 +234,19 @@ documentSchema.pre('save', function(next) {
 });
 
 // Methods
-documentSchema.methods.verify = async function(verifiedBy: string): Promise<IDocument> {
+documentSchema.methods.verify = async function(this: IDocument, verifiedBy: string): Promise<IDocument> {
   this.isVerified = true;
   this.verifiedBy = new mongoose.Types.ObjectId(verifiedBy);
   this.verifiedAt = new Date();
   return this.save();
 };
 
-documentSchema.methods.archive = async function(): Promise<IDocument> {
+documentSchema.methods.archive = async function(this: IDocument): Promise<IDocument> {
   this.status = 'archived';
   return this.save();
 };
 
-documentSchema.methods.softDelete = async function(deletedBy: string): Promise<IDocument> {
+documentSchema.methods.softDelete = async function(this: IDocument, deletedBy: string): Promise<IDocument> {
   this.isDeleted = true;
   this.deletedAt = new Date();
   this.deletedBy = new mongoose.Types.ObjectId(deletedBy);
@@ -240,15 +254,16 @@ documentSchema.methods.softDelete = async function(deletedBy: string): Promise<I
   return this.save();
 };
 
-documentSchema.methods.isAccessibleBy = function(accountId: string, role: string): boolean {
+documentSchema.methods.isAccessibleBy = function(this: IDocument, accountId: string, role: string): boolean {
   if (this.isPublic) return true;
-  if (this.allowedAccounts.some(id => id.toString() === accountId)) return true;
+  if (this.allowedAccounts.some((id) => id.toString() === accountId)) return true;
   if (this.allowedRoles.includes(role)) return true;
   return false;
 };
 
 // Static methods
 documentSchema.statics.findByEntity = function(
+  this: IDocumentModel,
   entityType: string,
   entityId: string,
   options: { type?: string; includeDeleted?: boolean } = {}
@@ -256,14 +271,14 @@ documentSchema.statics.findByEntity = function(
   const query: any = { entityType, entityId };
   if (options.type) query.documentType = options.type;
   if (!options.includeDeleted) query.isDeleted = false;
-  
+
   return this.find(query).sort({ createdAt: -1 });
 };
 
-documentSchema.statics.findExpiringSoon = function(days = 30) {
+documentSchema.statics.findExpiringSoon = function(this: IDocumentModel, days = 30) {
   const cutoff = new Date();
   cutoff.setDate(cutoff.getDate() + days);
-  
+
   return this.find({
     validUntil: { $lte: cutoff, $gte: new Date() },
     isDeleted: false,
@@ -273,4 +288,4 @@ documentSchema.statics.findExpiringSoon = function(days = 30) {
 
 documentSchema.plugin(tenantPlugin);
 
-export const Document = mongoose.model<IDocument>('Document', documentSchema);
+export const Document = mongoose.model<IDocument, IDocumentModel>('Document', documentSchema);

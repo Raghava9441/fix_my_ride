@@ -17,7 +17,7 @@ const DB_DEFAULTS = {
   READ_PREFERENCE:             'primaryPreferred',
   MAX_RECONNECT_ATTEMPTS:      5,
   RECONNECT_INTERVAL_MS:       5_000,
-};
+} as const;
 
 // ─── State ────────────────────────────────────────────────────────────────────
 
@@ -44,7 +44,7 @@ const buildConnectionOptions = () => ({
   readPreference:           DB_DEFAULTS.READ_PREFERENCE,
   retryWrites:              true,
   retryReads:               true,
-  compressors:              ['zstd', 'snappy', 'zlib'],
+  compressors:              ['zstd', 'snappy', 'zlib'] as ('none' | 'zstd' | 'snappy' | 'zlib')[],
 
   ...(config.isProduction && {
     ssl:                         true,
@@ -110,7 +110,7 @@ const scheduleReconnect = () => {
   setTimeout(async () => {
     try {
       await connectDatabase();
-    } catch (err) {
+    } catch (err: any) {
       console.error(`Reconnect attempt ${attempt} failed:`, err.message);
     }
   }, DB_DEFAULTS.RECONNECT_INTERVAL_MS);
@@ -138,7 +138,7 @@ export const connectDatabase = async () => {
     }
 
     return mongoose.connection;
-  } catch (err) {
+  } catch (err: any) {
     console.error('❌ Failed to connect to MongoDB:', err.message);
     throw err;
   }
@@ -153,7 +153,7 @@ export const disconnectDatabase = async () => {
     await mongoose.disconnect();
     state.isConnected = false;
     console.log('👋 Database connection closed');
-  } catch (err) {
+  } catch (err: any) {
     console.error('❌ Error disconnecting:', err.message);
     throw err;
   }
@@ -171,6 +171,14 @@ export const checkDatabaseHealth = async () => {
   }
 
   try {
+    if (!mongoose.connection.db) {
+      return {
+        status:     'unhealthy',
+        message:    'Database not initialized',
+        readyState: mongoose.connection.readyState,
+      };
+    }
+
     const ping = await mongoose.connection.db.admin().ping();
     return {
       status:     'healthy',
@@ -181,7 +189,7 @@ export const checkDatabaseHealth = async () => {
       name:       mongoose.connection.name,
       poolSize:   config.db.maxPoolSize,
     };
-  } catch (err) {
+  } catch (err: any) {
     return {
       status:     'unhealthy',
       message:    err.message,
@@ -198,10 +206,12 @@ export const checkDatabaseHealth = async () => {
  *   await User.create([data], { session })
  *   await Order.findOneAndUpdate(filter, update, { session })
  */
-export const withTransaction = async (callback) => {
+export const withTransaction = async <T>(
+  callback: (session: mongoose.ClientSession) => Promise<T>,
+): Promise<T> => {
   const session = await mongoose.startSession();
   try {
-    let result;
+    let result!: T;
     await session.withTransaction(async () => {
       result = await callback(session);
     });
@@ -213,9 +223,22 @@ export const withTransaction = async (callback) => {
 
 // ─── Pagination helper ────────────────────────────────────────────────────────
 
-export const paginate = async (model, query = {}, options = {}) => {
-  const page  = Math.max(1, parseInt(options.page,  10) || 1);
-  const limit = Math.max(1, parseInt(options.limit, 10) || 10);
+interface PaginateOptions {
+  page?: number | string;
+  limit?: number | string;
+  sort?: Record<string, 1 | -1>;
+  populate?: any;
+  select?: string;
+  lean?: boolean;
+}
+
+export const paginate = async (
+  model: mongoose.Model<any>,
+  query: Record<string, any> = {},
+  options: PaginateOptions = {},
+) => {
+  const page  = Math.max(1, parseInt(String(options.page ?? ''),  10) || 1);
+  const limit = Math.max(1, parseInt(String(options.limit ?? ''), 10) || 10);
   const {
     sort     = { createdAt: -1 },
     populate = [],
@@ -251,7 +274,10 @@ export const paginate = async (model, query = {}, options = {}) => {
  * @param {object} options
  * @param {string} options.deletedByRef - Model name for the deletedBy ref (default: 'Account')
  */
-export const softDeletePlugin = (schema, { deletedByRef = 'Account' } = {}) => {
+export const softDeletePlugin = (
+  schema: mongoose.Schema,
+  { deletedByRef = 'Account' }: { deletedByRef?: string } = {},
+) => {
   const { Schema } = mongoose;
 
   schema.add({
@@ -260,24 +286,24 @@ export const softDeletePlugin = (schema, { deletedByRef = 'Account' } = {}) => {
     deletedBy: { type: Schema.Types.ObjectId, ref: deletedByRef, default: null },
   });
 
-  const excludeDeleted = function () {
+  const excludeDeleted = function (this: mongoose.Query<any, any>) {
     if (this.getFilter().isDeleted === undefined) {
       this.where({ isDeleted: false });
     }
   };
 
-  ['find', 'findOne', 'findOneAndUpdate', 'countDocuments'].forEach(hook =>
+  (['find', 'findOne', 'findOneAndUpdate', 'countDocuments'] as const).forEach(hook =>
     schema.pre(hook, excludeDeleted)
   );
 
-  schema.methods.softDelete = function (deletedBy = null) {
+  schema.methods.softDelete = function (this: any, deletedBy: any = null) {
     this.isDeleted = true;
     this.deletedAt = new Date();
     if (deletedBy) this.deletedBy = deletedBy;
     return this.save();
   };
 
-  schema.methods.restore = function () {
+  schema.methods.restore = function (this: any) {
     this.isDeleted = false;
     this.deletedAt = null;
     this.deletedBy = null;
@@ -289,7 +315,7 @@ export const softDeletePlugin = (schema, { deletedByRef = 'Account' } = {}) => {
  * Audit trail plugin — tracks createdBy / updatedBy on every document.
  * Usage: doc.setCreatedBy(userId).save()
  */
-export const auditPlugin = (schema) => {
+export const auditPlugin = (schema: mongoose.Schema) => {
   const { Schema } = mongoose;
 
   schema.add({
@@ -297,19 +323,23 @@ export const auditPlugin = (schema) => {
     updatedBy: { type: Schema.Types.ObjectId, ref: 'Account' },
   });
 
-  schema.pre('save', function (next) {
+  schema.pre('save', function (this: any, next: (err?: mongoose.CallbackError) => void) {
     if (this.isNew  && this._createdBy) this.createdBy = this._createdBy;
     if (this._updatedBy)                this.updatedBy  = this._updatedBy;
     next();
   });
 
-  schema.methods.setCreatedBy = function (userId) { this._createdBy = userId; return this; };
-  schema.methods.setUpdatedBy = function (userId) { this._updatedBy = userId; return this; };
+  schema.methods.setCreatedBy = function (this: any, userId: any) { this._createdBy = userId; return this; };
+  schema.methods.setUpdatedBy = function (this: any, userId: any) { this._updatedBy = userId; return this; };
 };
 
 // ─── Bulk upsert ──────────────────────────────────────────────────────────────
 
-export const bulkUpsert = (model, data, matchFields = ['_id']) => {
+export const bulkUpsert = (
+  model: mongoose.Model<any>,
+  data: Record<string, any>[],
+  matchFields: string[] = ['_id'],
+) => {
   if (!data?.length) return Promise.resolve({ ok: 1, nUpserted: 0, nModified: 0 });
 
   const operations = data.map(item => ({
@@ -327,8 +357,8 @@ export const bulkUpsert = (model, data, matchFields = ['_id']) => {
 
 // ─── Graceful shutdown ────────────────────────────────────────────────────────
 
-export const setupGracefulShutdown = (server) => {
-  const shutdown = async (signal) => {
+export const setupGracefulShutdown = (server?: import('http').Server) => {
+  const shutdown = async (signal: string) => {
     console.log(`\n${signal} received — starting graceful shutdown…`);
     if (server) {
       await new Promise(resolve => server.close(resolve));

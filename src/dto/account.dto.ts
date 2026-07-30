@@ -1,14 +1,13 @@
 import { z } from "zod";
 
+export { IdParamSchema } from "./common.dto";
+export type { IdParamDTO } from "./common.dto";
+
 const ObjectIdSchema = z
   .string()
   .refine((val) => /^[0-9a-fA-F]{24}$/.test(val), {
     message: "Invalid ObjectId",
   });
-
-export const IdParamSchema = z.object({
-  id: ObjectIdSchema,
-});
 
 // ========== ACCOUNT DTOs ==========
 

@@ -217,7 +217,12 @@ export class InvitationService {
     permissions?: string[];
     message?: string;
   }): Promise<any> {
-    return Invitation.createVehicleAccess(input);
+    return Invitation.createVehicleAccess({
+      ...input,
+      inviterId: new mongoose.Types.ObjectId(input.inviterId),
+      vehicleId: new mongoose.Types.ObjectId(input.vehicleId),
+      serviceCenterId: new mongoose.Types.ObjectId(input.serviceCenterId),
+    });
   }
 }
 

@@ -70,6 +70,7 @@ export interface UpdateServiceRecordInput {
     laborTotal?: number;
     tax?: number;
     discount?: number;
+    currency?: string;
     paymentStatus?: "pending" | "paid" | "partial" | "waived";
     invoiceNumber?: string;
   };
@@ -344,7 +345,7 @@ export class ServiceRecordService {
       if (vehicle) {
         vehicle.currentOdometer = {
           value: record.odometerReading.value,
-          unit: record.odometerReading.unit,
+          unit: record.odometerReading.unit || "km",
           recordedAt: record.serviceDate,
         };
         if (record.nextService) {

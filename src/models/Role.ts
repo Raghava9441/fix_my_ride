@@ -1,7 +1,38 @@
-import mongoose, { Schema } from "mongoose";
+import mongoose, { Schema, Document, Model, Types } from "mongoose";
 import { tenantPlugin } from '../middleware/tenant/tenantPlugin';
 
-const roleSchema = new Schema({
+export interface IRole extends Document {
+  name: string;
+  slug: string;
+  description?: string;
+  type: 'system' | 'tenant' | 'custom';
+  tenantId?: Types.ObjectId;
+  serviceCenterId?: Types.ObjectId;
+  level: number;
+  permissions: Types.ObjectId[];
+  inheritsFrom: Types.ObjectId[];
+  color: string;
+  icon?: string;
+  maxUsers: number;
+  isActive: boolean;
+  isDefault: boolean;
+  createdBy?: Types.ObjectId;
+  createdAt: Date;
+  updatedAt: Date;
+
+  getAllPermissions(): Promise<string[]>;
+  hasPermission(permissionKey: string): Promise<boolean>;
+  addPermission(permissionKey: string): Promise<IRole>;
+  removePermission(permissionKey: string): Promise<IRole>;
+}
+
+export interface IRoleModel extends Model<IRole> {
+  getSystemRoles(): mongoose.Query<IRole[], IRole>;
+  seedSystemRoles(): Promise<void>;
+  findForServiceCenter(centerId: string | Types.ObjectId): mongoose.Query<IRole[], IRole>;
+}
+
+const roleSchema = new Schema<IRole, IRoleModel>({
   // Identity
   name: {
     type: String,
@@ -15,27 +46,27 @@ const roleSchema = new Schema({
     trim: true
   },
   description: String,
-  
+
   // Role Type
   type: {
     type: String,
     enum: ['system', 'tenant', 'custom'],
     default: 'custom'
   },
-  
+
   // For tenant-specific roles
   tenantId: {
     type: Schema.Types.ObjectId,
     ref: 'Tenant',
     index: true
   },
-  
+
   // Service center specific custom roles
   serviceCenterId: {
     type: Schema.Types.ObjectId,
     ref: 'ServiceCenter'
   },
-  
+
   // Hierarchy level (lower = more powerful)
   level: {
     type: Number,
@@ -43,30 +74,30 @@ const roleSchema = new Schema({
     min: 0,
     max: 1000
   },
-  
+
   // Permissions
   permissions: [{
     type: Schema.Types.ObjectId,
     ref: 'Permission'
   }],
-  
+
   // Inherited roles (cascading permissions)
   inheritsFrom: [{
     type: Schema.Types.ObjectId,
     ref: 'Role'
   }],
-  
+
   // UI/UX
   color: { type: String, default: '#6B7280' },
   icon: String,
-  
+
   // Limits
   maxUsers: { type: Number, default: 0 }, // 0 = unlimited
-  
+
   // Status
   isActive: { type: Boolean, default: true },
   isDefault: { type: Boolean, default: false }, // Auto-assign to new users
-  
+
   // Metadata
   createdBy: {
     type: Schema.Types.ObjectId,
@@ -90,59 +121,61 @@ roleSchema.pre('validate', async function(next) {
 });
 
 // Methods
-roleSchema.methods.getAllPermissions = async function() {
+roleSchema.methods.getAllPermissions = async function (this: IRole) {
   // Get direct permissions
   await this.populate('permissions');
-  let allPerms = new Set(this.permissions.map(p => p.key));
-  
+  const populatedPermissions = this.permissions as unknown as { key: string }[];
+  let allPerms = new Set(populatedPermissions.map(p => p.key));
+
   // Get inherited permissions
   if (this.inheritsFrom?.length > 0) {
     await this.populate('inheritsFrom');
-    for (const parentRole of this.inheritsFrom) {
+    const parentRoles = this.inheritsFrom as unknown as IRole[];
+    for (const parentRole of parentRoles) {
       const parentPerms = await parentRole.getAllPermissions();
       parentPerms.forEach(p => allPerms.add(p));
     }
   }
-  
+
   return Array.from(allPerms);
 };
 
-roleSchema.methods.hasPermission = async function(permissionKey) {
+roleSchema.methods.hasPermission = async function (this: IRole, permissionKey: string) {
   const allPerms = await this.getAllPermissions();
   return allPerms.includes(permissionKey);
 };
 
-roleSchema.methods.addPermission = async function(permissionKey) {
+roleSchema.methods.addPermission = async function (this: IRole, permissionKey: string) {
   const Permission = mongoose.model('Permission');
   const perm = await Permission.findOne({ key: permissionKey });
   if (!perm) throw new Error(`Permission ${permissionKey} not found`);
-  
-  if (!this.permissions.includes(perm._id)) {
-    this.permissions.push(perm._id);
+
+  if (!this.permissions.some((id) => id.equals(perm._id as Types.ObjectId))) {
+    this.permissions.push(perm._id as Types.ObjectId);
     await this.save();
   }
   return this;
 };
 
-roleSchema.methods.removePermission = async function(permissionKey) {
+roleSchema.methods.removePermission = async function (this: IRole, permissionKey: string) {
   const Permission = mongoose.model('Permission');
   const perm = await Permission.findOne({ key: permissionKey });
   if (!perm) return this;
-  
+
   this.permissions = this.permissions.filter(
-    p => p.toString() !== perm._id.toString()
+    (p) => p.toString() !== (perm._id as Types.ObjectId).toString()
   );
   return this.save();
 };
 
 // Static methods
-roleSchema.statics.getSystemRoles = async function() {
+roleSchema.statics.getSystemRoles = function (this: IRoleModel) {
   return this.find({ type: 'system', isActive: true }).populate('permissions');
 };
 
-roleSchema.statics.seedSystemRoles = async function() {
+roleSchema.statics.seedSystemRoles = async function (this: IRoleModel) {
   const Permission = mongoose.model('Permission');
-  
+
   const roles = [
     {
       name: 'System Admin',
@@ -216,11 +249,11 @@ roleSchema.statics.seedSystemRoles = async function() {
       isDefault: true
     }
   ];
-  
+
   for (const roleData of roles) {
     const permissionKeys = roleData.permissions;
     const permissions = await Permission.find({ key: { $in: permissionKeys } });
-    
+
     await this.findOneAndUpdate(
       { slug: roleData.slug, type: 'system' },
       {
@@ -232,7 +265,7 @@ roleSchema.statics.seedSystemRoles = async function() {
   }
 };
 
-roleSchema.statics.findForServiceCenter = function(centerId) {
+roleSchema.statics.findForServiceCenter = function (this: IRoleModel, centerId: string | Types.ObjectId) {
   return this.find({
     $or: [
       { type: 'system' },
@@ -244,4 +277,4 @@ roleSchema.statics.findForServiceCenter = function(centerId) {
 
 roleSchema.plugin(tenantPlugin);
 
-export const Role = mongoose.model('Role', roleSchema);
+export const Role = mongoose.model<IRole, IRoleModel>('Role', roleSchema);

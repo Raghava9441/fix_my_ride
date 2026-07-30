@@ -1,4 +1,5 @@
 import { Router, Request, Response } from "express";
+import { z } from "zod";
 import { asyncHandler, HttpStatus } from "../utils";
 import {
   validate,
@@ -81,10 +82,12 @@ router.post(
 
 router.delete(
   "/:id/roles/:roleId",
-  validateParams({
-    id: IdParamSchema.shape.id,
-    roleId: IdParamSchema.shape.id,
-  }),
+  validateParams(
+    z.object({
+      id: IdParamSchema.shape.id,
+      roleId: IdParamSchema.shape.id,
+    }),
+  ),
   asyncHandler(async (req: ValidatedRequest<any>, res: Response) => {
     await accountController.removeRole(req, res);
   }),
