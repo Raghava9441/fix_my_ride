@@ -1,5 +1,4 @@
 import mongoose, { Schema, Document, Model, Types } from "mongoose";
-import { tenantPlugin } from '../middleware/tenant/tenantPlugin';
 
 export interface IRole extends Document {
   name: string;
@@ -274,7 +273,5 @@ roleSchema.statics.findForServiceCenter = function (this: IRoleModel, centerId: 
     isActive: true
   }).populate('permissions');
 };
-
-roleSchema.plugin(tenantPlugin);
 
 export const Role = mongoose.model<IRole, IRoleModel>('Role', roleSchema);

@@ -4,7 +4,7 @@ import { tenantPlugin } from '../middleware/tenant/tenantPlugin';
 
 export interface INotification extends Document {
     recipientId: Types.ObjectId;
-    recipientModel: 'Owner' | 'User' | 'ServiceCenter';
+    recipientModel: 'Account' | 'ServiceCenter';
     title: string;
     content: string;
     channel: 'email' | 'sms' | 'push' | 'in_app';
@@ -81,7 +81,7 @@ const notificationSchema = new Schema<INotification, INotificationModel>({
     recipientModel: {
         type: String,
         required: true,
-        enum: ['Owner', 'User', 'ServiceCenter'],
+        enum: ['Account', 'ServiceCenter'],
         index: true
     },
 
@@ -176,11 +176,11 @@ const notificationSchema = new Schema<INotification, INotificationModel>({
         },
         ownerId: {
             type: mongoose.Schema.Types.ObjectId,
-            ref: 'Owner'
+            ref: 'OwnerProfile'
         },
         userId: {
             type: mongoose.Schema.Types.ObjectId,
-            ref: 'User'
+            ref: 'Account'
         },
         amount: {
             type: Number,
@@ -560,7 +560,9 @@ notificationSchema.pre(/^find/, function (this: mongoose.Query<any, any>) {
     if (!Object.prototype.hasOwnProperty.call(filter, 'isDeleted')) {
         this.where({ isDeleted: false });
     }
-    this.where({ expiresAt: { $gt: new Date() } });
+    if (!Object.prototype.hasOwnProperty.call(filter, 'expiresAt')) {
+        this.where({ expiresAt: { $gt: new Date() } });
+    }
 });
 
 notificationSchema.plugin(tenantPlugin);

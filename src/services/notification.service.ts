@@ -3,7 +3,7 @@ import mongoose from "mongoose";
 
 export interface CreateNotificationInput {
   recipientId: string;
-  recipientModel: "Owner" | "User" | "ServiceCenter";
+  recipientModel: "Account" | "ServiceCenter";
   title: string;
   content: string;
   channel: "email" | "sms" | "push" | "in_app";

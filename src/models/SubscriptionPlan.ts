@@ -1,6 +1,5 @@
 // models/SubscriptionPlan.ts
 import mongoose, { Schema, Document } from 'mongoose';
-import { tenantPlugin } from '../middleware/tenant/tenantPlugin';
 
 export interface ISubscriptionPlan extends Document {
   name: string;
@@ -149,7 +148,6 @@ const subscriptionPlanSchema = new Schema<ISubscriptionPlan, ISubscriptionPlanMo
 });
 
 // Indexes
-subscriptionPlanSchema.index({ slug: 1 }, { unique: true });
 subscriptionPlanSchema.index({ type: 1, isActive: 1 });
 subscriptionPlanSchema.index({ isPublic: 1, displayOrder: 1 });
 
@@ -269,7 +267,5 @@ subscriptionPlanSchema.statics.seedDefaults = async function(this: ISubscription
     );
   }
 };
-
-subscriptionPlanSchema.plugin(tenantPlugin);
 
 export const SubscriptionPlan = mongoose.model<ISubscriptionPlan, ISubscriptionPlanModel>('SubscriptionPlan', subscriptionPlanSchema);

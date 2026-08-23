@@ -12,7 +12,9 @@ import { logger } from "../../config/logger";
  *   - the model is registered as "shared" (no tenant scope), or
  *   - the current request belongs to an admin (global scope).
  *
- * Models opt in by setting `schema.options.tenantScoped = true`.
+ * Models opt in by calling `schema.plugin(tenantPlugin)` at the bottom of the
+ * model file (or by being in DEFAULT_SHARED / the `sharedCollections` option,
+ * which both leave the model unscoped instead).
  */
 
 export interface TenantPluginOptions {

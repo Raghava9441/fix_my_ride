@@ -210,7 +210,6 @@ const accountSchema = new Schema<IAccount, IAccountModel>({
 });
 
 // Indexes
-accountSchema.index({ email: 1 }, { unique: true });
 accountSchema.index({ phone: 1 }, { sparse: true });
 accountSchema.index({ tenantId: 1, email: 1 }, { sparse: true });
 accountSchema.index({ status: 1, lastLoginAt: -1 });

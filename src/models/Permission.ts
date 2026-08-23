@@ -1,5 +1,4 @@
 import mongoose, { Schema, Document, Model } from "mongoose";
-import { tenantPlugin } from '../middleware/tenant/tenantPlugin';
 
 export interface IPermission extends Document {
     key: string;
@@ -152,7 +151,5 @@ permissionSchema.statics.seedDefaults = async function (this: IPermissionModel) 
         );
     }
 };
-
-permissionSchema.plugin(tenantPlugin);
 
 export const Permission = mongoose.model<IPermission, IPermissionModel>('Permission', permissionSchema);

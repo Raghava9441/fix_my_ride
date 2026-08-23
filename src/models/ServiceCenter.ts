@@ -73,8 +73,6 @@ const serviceCenterSchema = new Schema<IServiceCenter, IServiceCenterModel>({
   },
   slug: {
     type: String,
-    unique: true,
-    sparse: true,
     lowercase: true
   },
   businessRegistrationNumber: {

@@ -140,6 +140,7 @@ ownerProfileSchema.methods.ownsResource = async function (this: IOwnerProfile, r
     }
 
     case 'reminder': {
+      if (!mongoose.modelNames().includes('Reminder')) return false;
       const Reminder = mongoose.model('Reminder');
       const reminder = await Reminder.findById(resourceId);
       return !!reminder && (reminder as any).ownerId.toString() === this._id.toString();

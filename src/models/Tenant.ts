@@ -191,7 +191,6 @@ const tenantSchema = new Schema<ITenant, ITenantModel>(
 );
 
 // Indexes
-tenantSchema.index({ slug: 1 }, { unique: true });
 tenantSchema.index({ contactEmail: 1 });
 tenantSchema.index({ "subscription.status": 1 });
 tenantSchema.index({ isActive: 1, createdAt: -1 });
@@ -244,7 +243,11 @@ tenantSchema.statics.findActive = function (this: ITenantModel) {
 
 // Pre-save: Sync limits from subscription plan
 tenantSchema.pre("save", async function (this: ITenant, next) {
-  if (this.subscription?.planId && !this.isDeleted) {
+  if (
+    this.subscription?.planId &&
+    !this.isDeleted &&
+    (this.isNew || this.isModified("subscription.planId"))
+  ) {
     const SubscriptionPlan = mongoose.model("SubscriptionPlan");
     const plan: any = await SubscriptionPlan.findById(this.subscription.planId);
     if (plan) {

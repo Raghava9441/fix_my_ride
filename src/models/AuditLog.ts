@@ -1,5 +1,6 @@
 // models/AuditLog.js
 import mongoose, { Schema, Document, Model, Types } from "mongoose";
+import { tenantPlugin } from '../middleware/tenant/tenantPlugin';
 
 export interface IAuditLog extends Document {
   tenantId?: Types.ObjectId;
@@ -70,5 +71,7 @@ auditLogSchema.index({ tenantId: 1, recordedAt: -1 });
 auditLogSchema.index({ actorId: 1, recordedAt: -1 });
 auditLogSchema.index({ entityId: 1, recordedAt: -1 });
 auditLogSchema.index({ recordedAt: 1 }, { expireAfterSeconds: 63072000 }); // 2 years
+
+auditLogSchema.plugin(tenantPlugin);
 
 export const AuditLog = mongoose.model<IAuditLog, IAuditLogModel>('AuditLog', auditLogSchema);

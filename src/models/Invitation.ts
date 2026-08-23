@@ -229,7 +229,6 @@ const invitationSchema = new Schema<IInvitation, IInvitationModel>({
 });
 
 // Indexes
-invitationSchema.index({ token: 1 }, { unique: true });
 invitationSchema.index({ inviteeEmail: 1, status: 1 });
 invitationSchema.index({ vehicleId: 1, status: 1 });
 invitationSchema.index({ serviceCenterId: 1, status: 1 });
