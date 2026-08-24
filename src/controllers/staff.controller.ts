@@ -1,194 +1,343 @@
-import { Request, Response, NextFunction } from "express";
-import { asyncHandler, createSuccessResponse, HttpStatus } from "../utils";
+import { Request, Response } from "express";
+import { ValidatedRequest } from "../middleware/validation.middleware";
+import {
+  StaffProfileService,
+  CreateStaffProfileInput,
+  UpdateStaffProfileInput,
+} from "../services/staff.service";
+import { ServiceRecordService } from "../services/serviceRecord.service";
+import {
+  HttpStatus,
+  createSuccessResponse,
+  createErrorResponse,
+  createPaginatedResponse,
+} from "../utils";
 
-export const staffController = {
-  getAllStaff: asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => {
-      const result = [
-        {
-          id: "staff-1",
-          name: "Mike Johnson",
-          role: "Mechanic",
-          status: "active",
-        },
-        {
-          id: "staff-2",
-          name: "Sarah Williams",
-          role: "Receptionist",
-          status: "active",
-        },
-      ];
-      const response = createSuccessResponse(
-        result,
-        "Staff retrieved successfully",
-        HttpStatus.OK,
+export class StaffController {
+  constructor(
+    private readonly staffService: StaffProfileService,
+    private readonly serviceRecordService: ServiceRecordService,
+  ) {}
+
+  async getAll(req: Request, res: Response) {
+    const filters = {
+      page: parseInt(req.query.page as string) || 1,
+      limit: parseInt(req.query.limit as string) || 20,
+      serviceCenterId: req.query.serviceCenterId as string,
+      employmentStatus: req.query.employmentStatus as string,
+      roleId: req.query.roleId as string,
+    };
+
+    const result = await this.staffService.findAll(filters);
+
+    const response = createPaginatedResponse(
+      result.data,
+      result.pagination.page,
+      result.pagination.limit,
+      result.pagination.total,
+      "Staff retrieved successfully",
+    );
+    return res.status(response.statusCode).json(response.toJSON());
+  }
+
+  async getById(req: Request, res: Response) {
+    const { id } = req.params;
+
+    const staff = await this.staffService.findById(id);
+
+    if (!staff) {
+      const error = createErrorResponse(
+        "Staff not found",
+        HttpStatus.NOT_FOUND,
       );
-      res.status(response.statusCode).json(response.toJSON());
-    },
-  ),
+      return res.status(error.statusCode).json(error.toJSON());
+    }
 
-  getStaffById: asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => {
-      const result = {
-        id: req.params.id,
-        name: "Mike Johnson",
-        role: "Mechanic",
-        status: "active",
-      };
-      const response = createSuccessResponse(
-        result,
-        "Staff retrieved successfully",
-        HttpStatus.OK,
-      );
-      res.status(response.statusCode).json(response.toJSON());
-    },
-  ),
+    const response = createSuccessResponse(
+      staff,
+      "Staff retrieved successfully",
+    );
+    return res.status(response.statusCode).json(response.toJSON());
+  }
 
-  createStaff: asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => {
-      const result = { id: "new-staff-id", ...req.body, status: "active" };
+  async create(req: ValidatedRequest<any>, res: Response) {
+    const data = req.validated;
+
+    const input: CreateStaffProfileInput = {
+      accountId: data.accountId,
+      serviceCenterId: data.serviceCenterId,
+      roleId: data.roleId,
+      employeeId: data.employeeId,
+      employmentType: data.employmentType,
+      workSchedule: data.workSchedule,
+      skills: data.skills,
+      specializations: data.specializations,
+    };
+
+    try {
+      const staff = await this.staffService.create(input);
+
       const response = createSuccessResponse(
-        result,
+        staff,
         "Staff created successfully",
         HttpStatus.CREATED,
       );
-      res.status(response.statusCode).json(response.toJSON());
-    },
-  ),
+      return res.status(response.statusCode).json(response.toJSON());
+    } catch (error: any) {
+      if (error.message === "Staff profile already exists for this account") {
+        const apiError = createErrorResponse(
+          error.message,
+          HttpStatus.CONFLICT,
+        );
+        return res.status(apiError.statusCode).json(apiError.toJSON());
+      }
+      if (
+        error.message === "Role not found" ||
+        error.message === "Service center not found"
+      ) {
+        const apiError = createErrorResponse(
+          error.message,
+          HttpStatus.NOT_FOUND,
+        );
+        return res.status(apiError.statusCode).json(apiError.toJSON());
+      }
+      throw error;
+    }
+  }
 
-  updateStaff: asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => {
-      const result = { id: req.params.id, ...req.body };
+  async update(req: ValidatedRequest<any>, res: Response) {
+    const { id } = req.params;
+    const data = req.validated;
+
+    const input: UpdateStaffProfileInput = {
+      roleId: data.roleId,
+      employeeId: data.employeeId,
+      employmentStatus: data.employmentStatus,
+      employmentType: data.employmentType,
+      workSchedule: data.workSchedule,
+      skills: data.skills,
+      specializations: data.specializations,
+    };
+
+    try {
+      const staff = await this.staffService.update(id, input);
+
+      if (!staff) {
+        const error = createErrorResponse(
+          "Staff not found",
+          HttpStatus.NOT_FOUND,
+        );
+        return res.status(error.statusCode).json(error.toJSON());
+      }
+
       const response = createSuccessResponse(
-        result,
+        staff,
         "Staff updated successfully",
-        HttpStatus.OK,
       );
-      res.status(response.statusCode).json(response.toJSON());
-    },
-  ),
+      return res.status(response.statusCode).json(response.toJSON());
+    } catch (error: any) {
+      if (error.message === "Role not found") {
+        const apiError = createErrorResponse(
+          "Role not found",
+          HttpStatus.NOT_FOUND,
+        );
+        return res.status(apiError.statusCode).json(apiError.toJSON());
+      }
+      throw error;
+    }
+  }
 
-  deleteStaff: asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => {
-      const result = {
-        id: req.params.id,
+  async delete(req: Request, res: Response) {
+    const { id } = req.params;
+
+    const staff = await this.staffService.delete(id);
+
+    if (!staff) {
+      const error = createErrorResponse(
+        "Staff not found",
+        HttpStatus.NOT_FOUND,
+      );
+      return res.status(error.statusCode).json(error.toJSON());
+    }
+
+    const response = createSuccessResponse(
+      {
+        id: staff._id,
         deleted: true,
-        deletedAt: new Date().toISOString(),
-      };
-      const response = createSuccessResponse(
-        result,
-        "Staff deleted successfully",
-        HttpStatus.OK,
-      );
-      res.status(response.statusCode).json(response.toJSON());
-    },
-  ),
+        deletedAt: staff.deletedAt,
+      },
+      "Staff deleted successfully",
+    );
+    return res.status(response.statusCode).json(response.toJSON());
+  }
 
-  getStaffPermissions: asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => {
-      const result = [
-        {
-          id: "perm-1",
-          name: "create_service_record",
-          description: "Can create service records",
-        },
-      ];
+  async getPermissions(req: Request, res: Response) {
+    const { id } = req.params;
+
+    try {
+      const permissions = await this.staffService.getPermissions(id);
+
       const response = createSuccessResponse(
-        result,
+        permissions,
         "Permissions retrieved successfully",
-        HttpStatus.OK,
       );
-      res.status(response.statusCode).json(response.toJSON());
-    },
-  ),
+      return res.status(response.statusCode).json(response.toJSON());
+    } catch (error: any) {
+      if (error.message === "Staff profile not found") {
+        const apiError = createErrorResponse(
+          "Staff not found",
+          HttpStatus.NOT_FOUND,
+        );
+        return res.status(apiError.statusCode).json(apiError.toJSON());
+      }
+      throw error;
+    }
+  }
 
-  addPermission: asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => {
-      const result = {
-        staffId: req.params.id,
-        permissionId: req.body.permissionId,
-      };
+  async addPermission(req: ValidatedRequest<any>, res: Response) {
+    const { id } = req.params;
+    const { permissionId, grantedBy, reason, expiresAt } = req.validated;
+
+    try {
+      const staff = await this.staffService.addPermission(
+        id,
+        permissionId,
+        grantedBy,
+        reason,
+        expiresAt ? new Date(expiresAt) : undefined,
+      );
+
       const response = createSuccessResponse(
-        result,
+        staff,
         "Permission added successfully",
         HttpStatus.CREATED,
       );
-      res.status(response.statusCode).json(response.toJSON());
-    },
-  ),
+      return res.status(response.statusCode).json(response.toJSON());
+    } catch (error: any) {
+      if (error.message === "Staff profile not found") {
+        const apiError = createErrorResponse(
+          "Staff not found",
+          HttpStatus.NOT_FOUND,
+        );
+        return res.status(apiError.statusCode).json(apiError.toJSON());
+      }
+      if (error.message === "Permission already granted") {
+        const apiError = createErrorResponse(
+          error.message,
+          HttpStatus.CONFLICT,
+        );
+        return res.status(apiError.statusCode).json(apiError.toJSON());
+      }
+      throw error;
+    }
+  }
 
-  removePermission: asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => {
-      const result = {
-        staffId: req.params.id,
-        permissionId: req.params.permissionId,
-        removed: true,
-      };
+  async removePermission(req: Request, res: Response) {
+    const { id, permissionId } = req.params;
+
+    try {
+      const staff = await this.staffService.removePermission(id, permissionId);
+
       const response = createSuccessResponse(
-        result,
+        {
+          staffId: staff._id,
+          permissionId,
+          removed: true,
+        },
         "Permission removed successfully",
-        HttpStatus.OK,
       );
-      res.status(response.statusCode).json(response.toJSON());
-    },
-  ),
+      return res.status(response.statusCode).json(response.toJSON());
+    } catch (error: any) {
+      if (error.message === "Staff profile not found") {
+        const apiError = createErrorResponse(
+          "Staff not found",
+          HttpStatus.NOT_FOUND,
+        );
+        return res.status(apiError.statusCode).json(apiError.toJSON());
+      }
+      throw error;
+    }
+  }
 
-  getSchedule: asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => {
-      const result = {
-        monday: "9AM-6PM",
-        tuesday: "9AM-6PM",
-        wednesday: "9AM-6PM",
-      };
+  async getSchedule(req: Request, res: Response) {
+    const { id } = req.params;
+
+    try {
+      const schedule = await this.staffService.getSchedule(id);
+
       const response = createSuccessResponse(
-        result,
+        schedule,
         "Schedule retrieved successfully",
-        HttpStatus.OK,
       );
-      res.status(response.statusCode).json(response.toJSON());
-    },
-  ),
+      return res.status(response.statusCode).json(response.toJSON());
+    } catch (error: any) {
+      if (error.message === "Staff profile not found") {
+        const apiError = createErrorResponse(
+          "Staff not found",
+          HttpStatus.NOT_FOUND,
+        );
+        return res.status(apiError.statusCode).json(apiError.toJSON());
+      }
+      throw error;
+    }
+  }
 
-  updateSchedule: asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => {
-      const result = { staffId: req.params.id, ...req.body };
+  async updateSchedule(req: ValidatedRequest<any>, res: Response) {
+    const { id } = req.params;
+    const { workSchedule } = req.validated;
+
+    try {
+      const staff = await this.staffService.updateSchedule(id, workSchedule);
+
       const response = createSuccessResponse(
-        result,
+        staff,
         "Schedule updated successfully",
-        HttpStatus.OK,
       );
-      res.status(response.statusCode).json(response.toJSON());
-    },
-  ),
+      return res.status(response.statusCode).json(response.toJSON());
+    } catch (error: any) {
+      if (error.message === "Staff profile not found") {
+        const apiError = createErrorResponse(
+          "Staff not found",
+          HttpStatus.NOT_FOUND,
+        );
+        return res.status(apiError.statusCode).json(apiError.toJSON());
+      }
+      throw error;
+    }
+  }
 
-  getPerformance: asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => {
-      const result = {
-        servicesCompleted: 50,
-        rating: 4.5,
-        averageTime: "45 min",
-      };
+  async getPerformance(req: Request, res: Response) {
+    const { id } = req.params;
+
+    try {
+      const performance = await this.staffService.getPerformance(id);
+
       const response = createSuccessResponse(
-        result,
+        performance,
         "Performance retrieved successfully",
-        HttpStatus.OK,
       );
-      res.status(response.statusCode).json(response.toJSON());
-    },
-  ),
+      return res.status(response.statusCode).json(response.toJSON());
+    } catch (error: any) {
+      if (error.message === "Staff profile not found") {
+        const apiError = createErrorResponse(
+          "Staff not found",
+          HttpStatus.NOT_FOUND,
+        );
+        return res.status(apiError.statusCode).json(apiError.toJSON());
+      }
+      throw error;
+    }
+  }
 
-  getStaffServices: asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => {
-      const result = [
-        { id: "service-1", name: "Oil Change", count: 20 },
-        { id: "service-2", name: "Tire Rotation", count: 15 },
-      ];
-      const response = createSuccessResponse(
-        result,
-        "Staff services retrieved successfully",
-        HttpStatus.OK,
-      );
-      res.status(response.statusCode).json(response.toJSON());
-    },
-  ),
-};
+  async getStaffServices(req: Request, res: Response) {
+    const { id } = req.params;
+
+    const records = await this.serviceRecordService.findByTechnician(id);
+
+    const response = createSuccessResponse(
+      records,
+      "Staff services retrieved successfully",
+    );
+    return res.status(response.statusCode).json(response.toJSON());
+  }
+}

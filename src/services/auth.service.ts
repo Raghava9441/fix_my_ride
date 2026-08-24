@@ -434,7 +434,10 @@ export const authService = {
    * Get the currently authenticated account (safe projection).
    */
   async getMe(userId: string): Promise<any> {
-    const account = await Account.findById(userId).select("-passwordHash -mfaSecret -mfaBackupCodes -authProviderId");
+    // mfaBackupCodes.code already carries schema-level `select: false`; also
+    // excluding the parent array here collides with that in Mongoose's
+    // projection merging ("Path collision at mfaBackupCodes.code").
+    const account = await Account.findById(userId).select("-passwordHash -mfaSecret -authProviderId");
     if (!account) {
       throw AppError.fromCode("NOT_FOUND", { message: "Account not found" });
     }

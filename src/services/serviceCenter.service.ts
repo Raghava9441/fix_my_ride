@@ -141,6 +141,22 @@ export class ServiceCenterService {
       .sort({ name: 1 });
   }
 
+  async findNearby(
+    lng: number,
+    lat: number,
+    maxDistanceMeters: number = 10000,
+  ): Promise<any[]> {
+    return ServiceCenter.find({
+      isDeleted: false,
+      "address.coordinates": {
+        $near: {
+          $geometry: { type: "Point", coordinates: [lng, lat] },
+          $maxDistance: maxDistanceMeters,
+        },
+      },
+    }).limit(50);
+  }
+
   async create(input: CreateServiceCenterInput): Promise<any> {
     const existing = await ServiceCenter.findOne({
       businessRegistrationNumber: input.businessRegistrationNumber,

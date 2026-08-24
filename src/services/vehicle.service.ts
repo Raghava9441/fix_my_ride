@@ -319,6 +319,42 @@ export class VehicleService {
     return vehicle;
   }
 
+  async updateServiceCenterAccess(
+    vehicleId: string,
+    serviceCenterId: string,
+    updates: {
+      accessLevel?: "full" | "readonly" | "limited";
+      status?: "active" | "revoked" | "expired";
+    },
+  ): Promise<any> {
+    const vehicle = await Vehicle.findById(vehicleId);
+    if (!vehicle) {
+      throw new Error("Vehicle not found");
+    }
+
+    const center = vehicle.authorizedServiceCenters.find(
+      (asc) => asc.serviceCenterId.toString() === serviceCenterId,
+    );
+
+    if (!center) {
+      throw new Error("Service center not authorized");
+    }
+
+    if (updates.accessLevel) {
+      center.accessLevel = updates.accessLevel;
+    }
+
+    if (updates.status) {
+      center.status = updates.status;
+      if (updates.status === "revoked") {
+        center.revokedAt = new Date();
+      }
+    }
+
+    await vehicle.save();
+    return vehicle;
+  }
+
   async getServiceHistory(
     vehicleId: string,
     filters?: { page?: number; limit?: number; serviceCenterId?: string },

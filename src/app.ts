@@ -39,6 +39,9 @@ import reportRoutes from "./routes/report.routes";
 import publicRoutes from "./routes/public.routes";
 import accountRoutes from "./routes/account.routes";
 import healthRoutes from "./routes/health.routes";
+import notificationRoutes from "./routes/notification.routes";
+import documentRoutes from "./routes/document.routes";
+import auditRoutes from "./routes/audit.routes";
 
 // Import services
 // import { healthCheckService } from './services/health/healthCheckService';
@@ -161,6 +164,9 @@ app.use("/api/v1/reports", reportRoutes);
 app.use("/api/v1/admin", adminRoutes);
 app.use("/api/v1/public", publicRoutes);
 app.use("/api/v1/accounts", accountRoutes);
+app.use("/api/v1/notifications", notificationRoutes);
+app.use("/api/v1/documents", documentRoutes);
+app.use("/api/v1/audit-logs", auditRoutes);
 
 // ========================================
 // Static Files (for document uploads)

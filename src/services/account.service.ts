@@ -60,7 +60,7 @@ export class AccountService {
                 .populate("ownerProfile")
                 .populate("staffProfile")
                 .select(
-                    "-passwordHash -mfaSecret -mfaBackupCodes -emailVerificationToken -passwordResetToken",
+                    "-passwordHash -mfaSecret -emailVerificationToken -passwordResetToken",
                 )
                 .skip(skip)
                 .limit(limit)
@@ -83,7 +83,7 @@ export class AccountService {
         return Account.findOne({ _id: id, isDeleted: false })
             .populate("ownerProfile")
             .populate("staffProfile")
-            .select("-passwordHash -mfaSecret -mfaBackupCodes");
+            .select("-passwordHash -mfaSecret");
     }
 
     async create(input: CreateAccountInput): Promise<IAccount> {

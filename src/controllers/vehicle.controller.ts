@@ -1,434 +1,600 @@
-import { Request, Response, NextFunction } from "express";
-import { asyncHandler, createSuccessResponse, HttpStatus } from "../utils";
+import { Request, Response } from "express";
+import { ValidatedRequest } from "../middleware/validation.middleware";
+import {
+  VehicleService,
+  CreateVehicleInput,
+  UpdateVehicleInput,
+  VehicleFilters,
+} from "../services/vehicle.service";
+import { DocumentService } from "../services/document.service";
+import { ReminderService } from "../services/reminder.service";
+import {
+  HttpStatus,
+  createSuccessResponse,
+  createErrorResponse,
+  createPaginatedResponse,
+} from "../utils";
 
-export const vehicleController = {
-  getAllVehicles: asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => {
-      const result = [
-        {
-          id: "vehicle-1",
-          registrationNumber: "ABC-1234",
-          make: "Toyota",
-          model: "Camry",
-          year: 2022,
-        },
-        {
-          id: "vehicle-2",
-          registrationNumber: "XYZ-5678",
-          make: "Honda",
-          model: "Civic",
-          year: 2021,
-        },
-      ];
-      const response = createSuccessResponse(
-        result,
-        "Vehicles retrieved successfully",
-        HttpStatus.OK,
+export class VehicleController {
+  constructor(
+    private readonly vehicleService: VehicleService,
+    private readonly documentService: DocumentService,
+    private readonly reminderService: ReminderService,
+  ) {}
+
+  async getAllVehicles(req: Request, res: Response) {
+    const filters: VehicleFilters = {
+      page: parseInt(req.query.page as string) || 1,
+      limit: parseInt(req.query.limit as string) || 20,
+      tenantId: req.query.tenantId as string,
+      currentOwnerId: req.query.currentOwnerId as string,
+      make: req.query.make as string,
+      model: req.query.model as string,
+      year: req.query.year ? parseInt(req.query.year as string) : undefined,
+      fuelType: req.query.fuelType as string,
+    };
+
+    const result = await this.vehicleService.findAll(filters);
+
+    const response = createPaginatedResponse(
+      result.data,
+      result.pagination.page,
+      result.pagination.limit,
+      result.pagination.total,
+      "Vehicles retrieved successfully",
+    );
+    return res.status(response.statusCode).json(response.toJSON());
+  }
+
+  async searchVehicles(req: Request, res: Response) {
+    const error = createErrorResponse(
+      "Not implemented — vehicle.service.ts findAll has no text-search filter to search on",
+      HttpStatus.NOT_IMPLEMENTED,
+    );
+    return res.status(error.statusCode).json(error.toJSON());
+  }
+
+  async getVehicleByRegistration(req: Request, res: Response) {
+    const { regNumber } = req.params;
+
+    const vehicle = await this.vehicleService.findByRegistration(
+      regNumber,
+      req.tenantId,
+    );
+
+    if (!vehicle) {
+      const error = createErrorResponse(
+        "Vehicle not found",
+        HttpStatus.NOT_FOUND,
       );
-      res.status(response.statusCode).json(response.toJSON());
-    },
-  ),
+      return res.status(error.statusCode).json(error.toJSON());
+    }
 
-  searchVehicles: asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => {
-      const result = [
-        { id: "vehicle-1", registrationNumber: "ABC-1234", make: "Toyota" },
-      ];
-      const response = createSuccessResponse(
-        result,
-        "Vehicles found successfully",
-        HttpStatus.OK,
+    const response = createSuccessResponse(
+      vehicle,
+      "Vehicle retrieved successfully",
+    );
+    return res.status(response.statusCode).json(response.toJSON());
+  }
+
+  async getVehicleByVin(req: Request, res: Response) {
+    const { vin } = req.params;
+
+    const vehicle = await this.vehicleService.findByVin(vin);
+
+    if (!vehicle) {
+      const error = createErrorResponse(
+        "Vehicle not found",
+        HttpStatus.NOT_FOUND,
       );
-      res.status(response.statusCode).json(response.toJSON());
-    },
-  ),
+      return res.status(error.statusCode).json(error.toJSON());
+    }
 
-  getVehicleByRegistration: asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => {
-      const result = {
-        id: "vehicle-1",
-        registrationNumber: req.params.regNumber,
-        make: "Toyota",
-        model: "Camry",
-      };
-      const response = createSuccessResponse(
-        result,
-        "Vehicle retrieved successfully",
-        HttpStatus.OK,
+    const response = createSuccessResponse(
+      vehicle,
+      "Vehicle retrieved successfully",
+    );
+    return res.status(response.statusCode).json(response.toJSON());
+  }
+
+  async getVehicleById(req: Request, res: Response) {
+    const { id } = req.params;
+
+    const vehicle = await this.vehicleService.findById(id);
+
+    if (!vehicle) {
+      const error = createErrorResponse(
+        "Vehicle not found",
+        HttpStatus.NOT_FOUND,
       );
-      res.status(response.statusCode).json(response.toJSON());
-    },
-  ),
+      return res.status(error.statusCode).json(error.toJSON());
+    }
 
-  getVehicleByVin: asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => {
-      const result = {
-        id: "vehicle-1",
-        vin: req.params.vin,
-        make: "Toyota",
-        model: "Camry",
-      };
-      const response = createSuccessResponse(
-        result,
-        "Vehicle retrieved successfully",
-        HttpStatus.OK,
+    const response = createSuccessResponse(
+      vehicle,
+      "Vehicle retrieved successfully",
+    );
+    return res.status(response.statusCode).json(response.toJSON());
+  }
+
+  async createVehicle(req: ValidatedRequest<any>, res: Response) {
+    const data = req.validated;
+
+    if (!data.currentOdometer) {
+      const error = createErrorResponse(
+        "currentOdometer is required",
+        HttpStatus.BAD_REQUEST,
       );
-      res.status(response.statusCode).json(response.toJSON());
-    },
-  ),
+      return res.status(error.statusCode).json(error.toJSON());
+    }
 
-  getVehicleById: asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => {
-      const result = {
-        id: req.params.id,
-        registrationNumber: "ABC-1234",
-        make: "Toyota",
-        model: "Camry",
-        year: 2022,
-      };
-      const response = createSuccessResponse(
-        result,
-        "Vehicle retrieved successfully",
-        HttpStatus.OK,
-      );
-      res.status(response.statusCode).json(response.toJSON());
-    },
-  ),
+    const input: CreateVehicleInput = {
+      tenantId: data.tenantId,
+      registrationNumber: data.registrationNumber,
+      vin: data.vin,
+      make: data.make,
+      model: data.model,
+      year: data.year,
+      fuelType: data.fuelType,
+      transmission: data.transmission,
+      color: data.color,
+      currentOwnerId: data.currentOwnerId,
+      currentOdometer: {
+        value: data.currentOdometer.value,
+        unit: data.currentOdometer.unit,
+      },
+      serviceSchedule: data.serviceSchedule,
+    };
 
-  createVehicle: asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => {
-      const result = { id: "new-vehicle-id", ...req.body, status: "active" };
+    try {
+      const vehicle = await this.vehicleService.create(input);
+
       const response = createSuccessResponse(
-        result,
+        vehicle,
         "Vehicle created successfully",
         HttpStatus.CREATED,
       );
-      res.status(response.statusCode).json(response.toJSON());
-    },
-  ),
+      return res.status(response.statusCode).json(response.toJSON());
+    } catch (error: any) {
+      if (
+        error.message === "Vehicle with this registration number already exists"
+      ) {
+        const apiError = createErrorResponse(
+          error.message,
+          HttpStatus.CONFLICT,
+        );
+        return res.status(apiError.statusCode).json(apiError.toJSON());
+      }
+      if (error.message === "Owner profile not found") {
+        const apiError = createErrorResponse(
+          error.message,
+          HttpStatus.NOT_FOUND,
+        );
+        return res.status(apiError.statusCode).json(apiError.toJSON());
+      }
+      throw error;
+    }
+  }
 
-  updateVehicle: asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => {
-      const result = { id: req.params.id, ...req.body };
-      const response = createSuccessResponse(
-        result,
-        "Vehicle updated successfully",
-        HttpStatus.OK,
+  async updateVehicle(req: ValidatedRequest<any>, res: Response) {
+    const { id } = req.params;
+    const data = req.validated;
+
+    const vehicle = await this.vehicleService.update(
+      id,
+      data as UpdateVehicleInput,
+    );
+
+    if (!vehicle) {
+      const error = createErrorResponse(
+        "Vehicle not found",
+        HttpStatus.NOT_FOUND,
       );
-      res.status(response.statusCode).json(response.toJSON());
-    },
-  ),
+      return res.status(error.statusCode).json(error.toJSON());
+    }
 
-  deleteVehicle: asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => {
-      const result = {
-        id: req.params.id,
+    const response = createSuccessResponse(
+      vehicle,
+      "Vehicle updated successfully",
+    );
+    return res.status(response.statusCode).json(response.toJSON());
+  }
+
+  async deleteVehicle(req: Request, res: Response) {
+    const { id } = req.params;
+
+    const vehicle = await this.vehicleService.delete(id);
+
+    if (!vehicle) {
+      const error = createErrorResponse(
+        "Vehicle not found",
+        HttpStatus.NOT_FOUND,
+      );
+      return res.status(error.statusCode).json(error.toJSON());
+    }
+
+    const response = createSuccessResponse(
+      {
+        id: vehicle._id,
         deleted: true,
-        deletedAt: new Date().toISOString(),
-      };
-      const response = createSuccessResponse(
-        result,
-        "Vehicle deleted successfully",
-        HttpStatus.OK,
-      );
-      res.status(response.statusCode).json(response.toJSON());
-    },
-  ),
+        deletedAt: vehicle.deletedAt,
+      },
+      "Vehicle deleted successfully",
+    );
+    return res.status(response.statusCode).json(response.toJSON());
+  }
 
-  getServiceRecords: asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => {
-      const result = [
-        {
-          id: "record-1",
-          serviceDate: "2024-01-15",
-          serviceType: "oil-change",
-          cost: 5000,
-        },
-        {
-          id: "record-2",
-          serviceDate: "2024-02-20",
-          serviceType: "tire-rotation",
-          cost: 3000,
-        },
-      ];
-      const response = createSuccessResponse(
-        result,
-        "Service records retrieved successfully",
-        HttpStatus.OK,
-      );
-      res.status(response.statusCode).json(response.toJSON());
-    },
-  ),
+  async getServiceRecords(req: Request, res: Response) {
+    const { id } = req.params;
+    const filters = {
+      page: parseInt(req.query.page as string) || 1,
+      limit: parseInt(req.query.limit as string) || 20,
+      serviceCenterId: req.query.serviceCenterId as string,
+    };
 
-  getAuthorizedCenters: asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => {
-      const result = [
-        { id: "center-1", name: "Quick Fix Auto", authorized: true },
-        { id: "center-2", name: "Premium Motors", authorized: true },
-      ];
-      const response = createSuccessResponse(
-        result,
-        "Authorized centers retrieved successfully",
-        HttpStatus.OK,
-      );
-      res.status(response.statusCode).json(response.toJSON());
-    },
-  ),
+    const result = await this.vehicleService.getServiceHistory(id, filters);
 
-  authorizeCenter: asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => {
-      const result = {
-        vehicleId: req.params.id,
-        centerId: req.body.centerId,
-        authorized: true,
-      };
+    const response = createPaginatedResponse(
+      result.data,
+      result.pagination.page,
+      result.pagination.limit,
+      result.pagination.total,
+      "Service records retrieved successfully",
+    );
+    return res.status(response.statusCode).json(response.toJSON());
+  }
+
+  async getAuthorizedCenters(req: Request, res: Response) {
+    const { id } = req.params;
+
+    const vehicle = await this.vehicleService.findById(id);
+
+    if (!vehicle) {
+      const error = createErrorResponse(
+        "Vehicle not found",
+        HttpStatus.NOT_FOUND,
+      );
+      return res.status(error.statusCode).json(error.toJSON());
+    }
+
+    const response = createSuccessResponse(
+      vehicle.authorizedServiceCenters,
+      "Authorized centers retrieved successfully",
+    );
+    return res.status(response.statusCode).json(response.toJSON());
+  }
+
+  async authorizeCenter(req: ValidatedRequest<any>, res: Response) {
+    const { id } = req.params;
+    const { centerId, accessLevel } = req.validated;
+
+    try {
+      const vehicle = await this.vehicleService.authorizeServiceCenter(
+        id,
+        centerId,
+        req.userId as string,
+        accessLevel,
+      );
+
       const response = createSuccessResponse(
-        result,
+        vehicle,
         "Center authorized successfully",
         HttpStatus.CREATED,
       );
-      res.status(response.statusCode).json(response.toJSON());
-    },
-  ),
+      return res.status(response.statusCode).json(response.toJSON());
+    } catch (error: any) {
+      if (
+        error.message === "Vehicle not found" ||
+        error.message === "Service center not found"
+      ) {
+        const apiError = createErrorResponse(
+          error.message,
+          HttpStatus.NOT_FOUND,
+        );
+        return res.status(apiError.statusCode).json(apiError.toJSON());
+      }
+      throw error;
+    }
+  }
 
-  updateCenterAccess: asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => {
-      const result = {
-        vehicleId: req.params.id,
-        centerId: req.params.centerId,
-        ...req.body,
-      };
+  async updateCenterAccess(req: ValidatedRequest<any>, res: Response) {
+    const { id, centerId } = req.params;
+    const updates = req.validated;
+
+    try {
+      const vehicle = await this.vehicleService.updateServiceCenterAccess(
+        id,
+        centerId,
+        updates,
+      );
+
       const response = createSuccessResponse(
-        result,
+        vehicle,
         "Center access updated successfully",
-        HttpStatus.OK,
       );
-      res.status(response.statusCode).json(response.toJSON());
-    },
-  ),
+      return res.status(response.statusCode).json(response.toJSON());
+    } catch (error: any) {
+      if (
+        error.message === "Vehicle not found" ||
+        error.message === "Service center not authorized"
+      ) {
+        const apiError = createErrorResponse(
+          error.message,
+          HttpStatus.NOT_FOUND,
+        );
+        return res.status(apiError.statusCode).json(apiError.toJSON());
+      }
+      throw error;
+    }
+  }
 
-  revokeCenterAccess: asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => {
-      const result = {
-        vehicleId: req.params.id,
-        centerId: req.params.centerId,
-        authorized: false,
-      };
+  async revokeCenterAccess(req: Request, res: Response) {
+    const { id, centerId } = req.params;
+
+    try {
+      const vehicle = await this.vehicleService.revokeServiceCenter(
+        id,
+        centerId,
+      );
+
       const response = createSuccessResponse(
-        result,
+        vehicle,
         "Center access revoked successfully",
-        HttpStatus.OK,
       );
-      res.status(response.statusCode).json(response.toJSON());
-    },
-  ),
+      return res.status(response.statusCode).json(response.toJSON());
+    } catch (error: any) {
+      if (
+        error.message === "Vehicle not found" ||
+        error.message === "Service center not authorized"
+      ) {
+        const apiError = createErrorResponse(
+          error.message,
+          HttpStatus.NOT_FOUND,
+        );
+        return res.status(apiError.statusCode).json(apiError.toJSON());
+      }
+      throw error;
+    }
+  }
 
-  getCurrentOdometer: asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => {
-      const result = {
-        reading: 50000,
-        unit: "km",
-        updatedAt: new Date().toISOString(),
-      };
-      const response = createSuccessResponse(
-        result,
-        "Odometer reading retrieved successfully",
-        HttpStatus.OK,
+  async getCurrentOdometer(req: Request, res: Response) {
+    const { id } = req.params;
+
+    const vehicle = await this.vehicleService.findById(id);
+
+    if (!vehicle) {
+      const error = createErrorResponse(
+        "Vehicle not found",
+        HttpStatus.NOT_FOUND,
       );
-      res.status(response.statusCode).json(response.toJSON());
-    },
-  ),
+      return res.status(error.statusCode).json(error.toJSON());
+    }
 
-  updateOdometer: asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => {
-      const result = {
-        vehicleId: req.params.id,
-        reading: req.body.reading,
-        updatedAt: new Date().toISOString(),
-      };
+    const response = createSuccessResponse(
+      vehicle.currentOdometer,
+      "Odometer reading retrieved successfully",
+    );
+    return res.status(response.statusCode).json(response.toJSON());
+  }
+
+  async updateOdometer(req: ValidatedRequest<any>, res: Response) {
+    const { id } = req.params;
+    const { reading, unit, source } = req.validated;
+
+    try {
+      const vehicle = await this.vehicleService.updateOdometer(
+        id,
+        reading,
+        unit,
+        req.userId,
+        source,
+      );
+
       const response = createSuccessResponse(
-        result,
+        vehicle.currentOdometer,
         "Odometer updated successfully",
-        HttpStatus.OK,
       );
-      res.status(response.statusCode).json(response.toJSON());
-    },
-  ),
+      return res.status(response.statusCode).json(response.toJSON());
+    } catch (error: any) {
+      if (error.message === "Vehicle not found") {
+        const apiError = createErrorResponse(
+          error.message,
+          HttpStatus.NOT_FOUND,
+        );
+        return res.status(apiError.statusCode).json(apiError.toJSON());
+      }
+      if (
+        error.message ===
+        "New odometer reading cannot be less than current reading"
+      ) {
+        const apiError = createErrorResponse(
+          error.message,
+          HttpStatus.BAD_REQUEST,
+        );
+        return res.status(apiError.statusCode).json(apiError.toJSON());
+      }
+      throw error;
+    }
+  }
 
-  getOdometerHistory: asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => {
-      const result = [
-        { reading: 45000, date: "2024-01-01" },
-        { reading: 50000, date: "2024-03-01" },
-      ];
-      const response = createSuccessResponse(
-        result,
-        "Odometer history retrieved successfully",
-        HttpStatus.OK,
+  async getOdometerHistory(req: Request, res: Response) {
+    const { id } = req.params;
+    const options = {
+      limit: req.query.limit ? parseInt(req.query.limit as string) : undefined,
+      from: req.query.from ? new Date(req.query.from as string) : undefined,
+      to: req.query.to ? new Date(req.query.to as string) : undefined,
+    };
+
+    const history = await this.vehicleService.getOdometerHistory(id, options);
+
+    const response = createSuccessResponse(
+      history,
+      "Odometer history retrieved successfully",
+    );
+    return res.status(response.statusCode).json(response.toJSON());
+  }
+
+  async getDocuments(req: Request, res: Response) {
+    const { id } = req.params;
+
+    const documents = await this.documentService.findByEntity("vehicle", id);
+
+    const response = createSuccessResponse(
+      documents,
+      "Documents retrieved successfully",
+    );
+    return res.status(response.statusCode).json(response.toJSON());
+  }
+
+  async uploadDocument(req: Request, res: Response) {
+    const error = createErrorResponse(
+      "Not implemented — file-storage subsystem (multer + storage service) is not wired up yet",
+      HttpStatus.NOT_IMPLEMENTED,
+    );
+    return res.status(error.statusCode).json(error.toJSON());
+  }
+
+  async deleteDocument(req: Request, res: Response) {
+    const error = createErrorResponse(
+      "Not implemented — file-storage subsystem (multer + storage service) is not wired up yet",
+      HttpStatus.NOT_IMPLEMENTED,
+    );
+    return res.status(error.statusCode).json(error.toJSON());
+  }
+
+  async downloadDocument(req: Request, res: Response) {
+    const error = createErrorResponse(
+      "Not implemented — file-storage subsystem (multer + storage service) is not wired up yet",
+      HttpStatus.NOT_IMPLEMENTED,
+    );
+    return res.status(error.statusCode).json(error.toJSON());
+  }
+
+  async getReminders(req: Request, res: Response) {
+    const { id } = req.params;
+    const filters = {
+      vehicleId: id,
+      page: parseInt(req.query.page as string) || 1,
+      limit: parseInt(req.query.limit as string) || 20,
+    };
+
+    const result = await this.reminderService.findAll(filters);
+
+    const response = createPaginatedResponse(
+      result.data,
+      result.pagination.page,
+      result.pagination.limit,
+      result.pagination.total,
+      "Reminders retrieved successfully",
+    );
+    return res.status(response.statusCode).json(response.toJSON());
+  }
+
+  async getWarranty(req: Request, res: Response) {
+    const error = createErrorResponse(
+      "Not implemented — no warranty/insurance field on the Vehicle schema yet",
+      HttpStatus.NOT_IMPLEMENTED,
+    );
+    return res.status(error.statusCode).json(error.toJSON());
+  }
+
+  async updateWarranty(req: Request, res: Response) {
+    const error = createErrorResponse(
+      "Not implemented — no warranty/insurance field on the Vehicle schema yet",
+      HttpStatus.NOT_IMPLEMENTED,
+    );
+    return res.status(error.statusCode).json(error.toJSON());
+  }
+
+  async getInsurance(req: Request, res: Response) {
+    const error = createErrorResponse(
+      "Not implemented — no warranty/insurance field on the Vehicle schema yet",
+      HttpStatus.NOT_IMPLEMENTED,
+    );
+    return res.status(error.statusCode).json(error.toJSON());
+  }
+
+  async updateInsurance(req: Request, res: Response) {
+    const error = createErrorResponse(
+      "Not implemented — no warranty/insurance field on the Vehicle schema yet",
+      HttpStatus.NOT_IMPLEMENTED,
+    );
+    return res.status(error.statusCode).json(error.toJSON());
+  }
+
+  async transferOwnership(req: ValidatedRequest<any>, res: Response) {
+    const { id } = req.params;
+    const { newOwnerId, transferReason } = req.validated;
+
+    try {
+      const vehicle = await this.vehicleService.transferOwnership(
+        id,
+        newOwnerId,
+        transferReason,
       );
-      res.status(response.statusCode).json(response.toJSON());
-    },
-  ),
 
-  getDocuments: asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => {
-      const result = [
-        { id: "doc-1", name: "Registration", type: "pdf" },
-        { id: "doc-2", name: "Insurance", type: "pdf" },
-      ];
       const response = createSuccessResponse(
-        result,
-        "Documents retrieved successfully",
-        HttpStatus.OK,
-      );
-      res.status(response.statusCode).json(response.toJSON());
-    },
-  ),
-
-  uploadDocument: asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => {
-      const result = {
-        id: "new-doc-id",
-        vehicleId: req.params.id,
-        ...req.body,
-      };
-      const response = createSuccessResponse(
-        result,
-        "Document uploaded successfully",
-        HttpStatus.CREATED,
-      );
-      res.status(response.statusCode).json(response.toJSON());
-    },
-  ),
-
-  deleteDocument: asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => {
-      const result = { id: req.params.documentId, deleted: true };
-      const response = createSuccessResponse(
-        result,
-        "Document deleted successfully",
-        HttpStatus.OK,
-      );
-      res.status(response.statusCode).json(response.toJSON());
-    },
-  ),
-
-  downloadDocument: asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => {
-      const result = { url: "/uploads/documents/document.pdf" };
-      const response = createSuccessResponse(
-        result,
-        "Document download URL retrieved",
-        HttpStatus.OK,
-      );
-      res.status(response.statusCode).json(response.toJSON());
-    },
-  ),
-
-  getReminders: asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => {
-      const result = [
-        {
-          id: "reminder-1",
-          type: "service",
-          dueDate: "2024-04-01",
-          completed: false,
-        },
-      ];
-      const response = createSuccessResponse(
-        result,
-        "Reminders retrieved successfully",
-        HttpStatus.OK,
-      );
-      res.status(response.statusCode).json(response.toJSON());
-    },
-  ),
-
-  getWarranty: asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => {
-      const result = {
-        provider: "Toyota",
-        expires: "2025-12-31",
-        coverage: "5 years",
-      };
-      const response = createSuccessResponse(
-        result,
-        "Warranty information retrieved successfully",
-        HttpStatus.OK,
-      );
-      res.status(response.statusCode).json(response.toJSON());
-    },
-  ),
-
-  updateWarranty: asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => {
-      const result = { vehicleId: req.params.id, ...req.body };
-      const response = createSuccessResponse(
-        result,
-        "Warranty updated successfully",
-        HttpStatus.OK,
-      );
-      res.status(response.statusCode).json(response.toJSON());
-    },
-  ),
-
-  getInsurance: asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => {
-      const result = {
-        provider: "ABC Insurance",
-        policyNumber: "POL-123456",
-        expires: "2025-06-30",
-      };
-      const response = createSuccessResponse(
-        result,
-        "Insurance information retrieved successfully",
-        HttpStatus.OK,
-      );
-      res.status(response.statusCode).json(response.toJSON());
-    },
-  ),
-
-  updateInsurance: asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => {
-      const result = { vehicleId: req.params.id, ...req.body };
-      const response = createSuccessResponse(
-        result,
-        "Insurance updated successfully",
-        HttpStatus.OK,
-      );
-      res.status(response.statusCode).json(response.toJSON());
-    },
-  ),
-
-  transferOwnership: asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => {
-      const result = {
-        vehicleId: req.params.id,
-        previousOwnerId: "old-owner",
-        newOwnerId: req.body.newOwnerId,
-      };
-      const response = createSuccessResponse(
-        result,
+        vehicle,
         "Ownership transferred successfully",
-        HttpStatus.OK,
       );
-      res.status(response.statusCode).json(response.toJSON());
-    },
-  ),
+      return res.status(response.statusCode).json(response.toJSON());
+    } catch (error: any) {
+      if (
+        error.message === "Vehicle not found" ||
+        error.message === "New owner not found"
+      ) {
+        const apiError = createErrorResponse(
+          error.message,
+          HttpStatus.NOT_FOUND,
+        );
+        return res.status(apiError.statusCode).json(apiError.toJSON());
+      }
+      throw error;
+    }
+  }
 
-  getVehicleStats: asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => {
-      const result = {
-        totalServiceCost: 8000,
-        serviceCount: 5,
-        averageServiceInterval: "60 days",
-      };
-      const response = createSuccessResponse(
-        result,
-        "Vehicle stats retrieved successfully",
-        HttpStatus.OK,
+  async getVehicleStats(req: Request, res: Response) {
+    const { id } = req.params;
+
+    const vehicle = await this.vehicleService.findById(id);
+
+    if (!vehicle) {
+      const error = createErrorResponse(
+        "Vehicle not found",
+        HttpStatus.NOT_FOUND,
       );
-      res.status(response.statusCode).json(response.toJSON());
-    },
-  ),
-};
+      return res.status(error.statusCode).json(error.toJSON());
+    }
+
+    const history = await this.vehicleService.getServiceHistory(id, {
+      limit: 1000,
+    });
+
+    const records = history.data;
+    const totalServiceCost = records.reduce(
+      (sum: number, record: any) => sum + (record.cost?.totalCost || 0),
+      0,
+    );
+
+    let averageServiceIntervalDays: number | null = null;
+    if (records.length >= 2) {
+      const dates = records
+        .map((r: any) => new Date(r.serviceDate).getTime())
+        .sort((a: number, b: number) => a - b);
+      const span = dates[dates.length - 1] - dates[0];
+      averageServiceIntervalDays = Math.round(
+        span / (dates.length - 1) / (1000 * 60 * 60 * 24),
+      );
+    }
+
+    const response = createSuccessResponse(
+      {
+        totalServiceCost,
+        serviceCount: history.pagination.total,
+        averageServiceIntervalDays,
+      },
+      "Vehicle stats retrieved successfully",
+    );
+    return res.status(response.statusCode).json(response.toJSON());
+  }
+}

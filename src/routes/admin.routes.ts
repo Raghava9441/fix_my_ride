@@ -1,25 +1,132 @@
-import { Router } from "express";
-import { adminController } from "../controllers/admin.controller";
+import { Router, Request, Response } from "express";
+import { asyncHandler } from "../utils";
+import { authenticate } from "../middleware/auth.middleware";
+import { requireRole } from "../middleware/authorization.middleware";
+import { AdminController } from "../controllers/admin.controller";
+import { adminService } from "../services/admin.service";
+import { tenantService } from "../services/tenant.service";
+import { accountService } from "../services/account.service";
+import { auditLogService } from "../services/audit.service";
 
 const router = Router();
 
-router.get("/dashboard", adminController.getDashboard);
-router.get("/stats", adminController.getSystemStats);
-router.get("/tenants", adminController.getAllTenants);
-router.post("/tenants", adminController.createTenant);
-router.get("/tenants/:id", adminController.getTenantById);
-router.put("/tenants/:id", adminController.updateTenant);
-router.delete("/tenants/:id", adminController.deleteTenant);
-router.patch("/tenants/:id/status", adminController.updateTenantStatus);
-router.get("/users", adminController.getAllUsers);
-router.patch("/users/:id/suspend", adminController.suspendUser);
-router.patch("/users/:id/activate", adminController.activateUser);
-router.get("/system/health", adminController.getSystemHealth);
-router.get("/system/logs", adminController.getSystemLogs);
-router.get("/system/metrics", adminController.getSystemMetrics);
-router.post("/maintenance/clear-cache", adminController.clearCache);
-router.post("/maintenance/reindex-search", adminController.reindexSearch);
-router.post("/maintenance/backup", adminController.createBackup);
-router.get("/audit-logs", adminController.getAuditLogs);
+const adminController = new AdminController(
+  adminService,
+  tenantService,
+  accountService,
+  auditLogService,
+);
+
+// Everything under /api/v1/admin is platform-admin only.
+router.use(authenticate, requireRole("admin"));
+
+router.get(
+  "/dashboard",
+  asyncHandler(async (req: Request, res: Response) => {
+    await adminController.getDashboard(req, res);
+  }),
+);
+router.get(
+  "/stats",
+  asyncHandler(async (req: Request, res: Response) => {
+    await adminController.getSystemStats(req, res);
+  }),
+);
+router.get(
+  "/tenants",
+  asyncHandler(async (req: Request, res: Response) => {
+    await adminController.getAllTenants(req, res);
+  }),
+);
+router.post(
+  "/tenants",
+  asyncHandler(async (req: Request, res: Response) => {
+    await adminController.createTenant(req, res);
+  }),
+);
+router.get(
+  "/tenants/:id",
+  asyncHandler(async (req: Request, res: Response) => {
+    await adminController.getTenantById(req, res);
+  }),
+);
+router.put(
+  "/tenants/:id",
+  asyncHandler(async (req: Request, res: Response) => {
+    await adminController.updateTenant(req, res);
+  }),
+);
+router.delete(
+  "/tenants/:id",
+  asyncHandler(async (req: Request, res: Response) => {
+    await adminController.deleteTenant(req, res);
+  }),
+);
+router.patch(
+  "/tenants/:id/status",
+  asyncHandler(async (req: Request, res: Response) => {
+    await adminController.updateTenantStatus(req, res);
+  }),
+);
+router.get(
+  "/users",
+  asyncHandler(async (req: Request, res: Response) => {
+    await adminController.getAllUsers(req, res);
+  }),
+);
+router.patch(
+  "/users/:id/suspend",
+  asyncHandler(async (req: Request, res: Response) => {
+    await adminController.suspendUser(req, res);
+  }),
+);
+router.patch(
+  "/users/:id/activate",
+  asyncHandler(async (req: Request, res: Response) => {
+    await adminController.activateUser(req, res);
+  }),
+);
+router.get(
+  "/system/health",
+  asyncHandler(async (req: Request, res: Response) => {
+    await adminController.getSystemHealth(req, res);
+  }),
+);
+router.get(
+  "/system/logs",
+  asyncHandler(async (req: Request, res: Response) => {
+    await adminController.getSystemLogs(req, res);
+  }),
+);
+router.get(
+  "/system/metrics",
+  asyncHandler(async (req: Request, res: Response) => {
+    await adminController.getSystemMetrics(req, res);
+  }),
+);
+router.post(
+  "/maintenance/clear-cache",
+  asyncHandler(async (req: Request, res: Response) => {
+    await adminController.clearCache(req, res);
+  }),
+);
+router.post(
+  "/maintenance/reindex-search",
+  asyncHandler(async (req: Request, res: Response) => {
+    await adminController.reindexSearch(req, res);
+  }),
+);
+router.post(
+  "/maintenance/backup",
+  asyncHandler(async (req: Request, res: Response) => {
+    await adminController.createBackup(req, res);
+  }),
+);
+router.get(
+  "/audit-logs",
+  asyncHandler(async (req: Request, res: Response) => {
+    await adminController.getAuditLogs(req, res);
+  }),
+);
 
 export default router;

@@ -1,51 +1,73 @@
-import { Router } from "express";
-import { reportController } from "../controllers/report.controller";
+import { Router, Request, Response } from "express";
+import { asyncHandler } from "../utils";
+import { authenticate } from "../middleware/auth.middleware";
+import { validate, ValidatedRequest } from "../middleware/validation.middleware";
+import { ExportReportSchema } from "../dto/report.dto";
+import { ReportController } from "../controllers/report.controller";
+import { reportService } from "../services/report.service";
+import { staffProfileService } from "../services/staff.service";
+import { ownerProfileService } from "../services/owner.service";
 
 const router = Router();
 
-router.get("/dashboard", reportController.getDashboard);
-router.get(
-  "/service-center/revenue",
-  reportController.getCenterRevenue,
+const reportController = new ReportController(reportService, staffProfileService, ownerProfileService);
+
+router.use(authenticate);
+
+router.get("/dashboard", asyncHandler(async (req: Request, res: Response) => {
+  await reportController.getDashboard(req, res);
+}));
+router.get("/service-center/revenue", asyncHandler(async (req: Request, res: Response) => {
+  await reportController.getCenterRevenue(req, res);
+}));
+router.get("/service-center/vehicles", asyncHandler(async (req: Request, res: Response) => {
+  await reportController.getCenterVehiclesReport(req, res);
+}));
+router.get("/service-center/services", asyncHandler(async (req: Request, res: Response) => {
+  await reportController.getCenterServicesReport(req, res);
+}));
+router.get("/service-center/staff-performance", asyncHandler(async (req: Request, res: Response) => {
+  await reportController.getStaffPerformance(req, res);
+}));
+router.get("/service-center/customer-satisfaction", asyncHandler(async (req: Request, res: Response) => {
+  await reportController.getCustomerSatisfaction(req, res);
+}));
+router.get("/service-center/parts-usage", asyncHandler(async (req: Request, res: Response) => {
+  await reportController.getPartsUsage(req, res);
+}));
+router.get("/owner/expenses", asyncHandler(async (req: Request, res: Response) => {
+  await reportController.getOwnerExpenses(req, res);
+}));
+router.get("/owner/service-history", asyncHandler(async (req: Request, res: Response) => {
+  await reportController.getOwnerServiceHistory(req, res);
+}));
+router.get("/owner/upcoming-services", asyncHandler(async (req: Request, res: Response) => {
+  await reportController.getUpcomingServices(req, res);
+}));
+router.get("/owner/maintenance-summary", asyncHandler(async (req: Request, res: Response) => {
+  await reportController.getMaintenanceSummary(req, res);
+}));
+router.get("/admin/tenants", asyncHandler(async (req: Request, res: Response) => {
+  await reportController.getTenantsReport(req, res);
+}));
+router.get("/admin/revenue", asyncHandler(async (req: Request, res: Response) => {
+  await reportController.getSaaSRevenue(req, res);
+}));
+router.get("/admin/growth", asyncHandler(async (req: Request, res: Response) => {
+  await reportController.getGrowthMetrics(req, res);
+}));
+router.get("/admin/retention", asyncHandler(async (req: Request, res: Response) => {
+  await reportController.getRetentionReport(req, res);
+}));
+router.get("/admin/churn", asyncHandler(async (req: Request, res: Response) => {
+  await reportController.getChurnReport(req, res);
+}));
+router.post(
+  "/export",
+  validate(ExportReportSchema),
+  asyncHandler(async (req: ValidatedRequest<any>, res: Response) => {
+    await reportController.exportReport(req, res);
+  }),
 );
-router.get(
-  "/service-center/vehicles",
-  reportController.getCenterVehiclesReport,
-);
-router.get(
-  "/service-center/services",
-  reportController.getCenterServicesReport,
-);
-router.get(
-  "/service-center/staff-performance",
-  reportController.getStaffPerformance,
-);
-router.get(
-  "/service-center/customer-satisfaction",
-  reportController.getCustomerSatisfaction,
-);
-router.get(
-  "/service-center/parts-usage",
-  reportController.getPartsUsage,
-);
-router.get("/owner/expenses", reportController.getOwnerExpenses);
-router.get(
-  "/owner/service-history",
-  reportController.getOwnerServiceHistory,
-);
-router.get(
-  "/owner/upcoming-services",
-  reportController.getUpcomingServices,
-);
-router.get(
-  "/owner/maintenance-summary",
-  reportController.getMaintenanceSummary,
-);
-router.get("/admin/tenants", reportController.getTenantsReport);
-router.get("/admin/revenue", reportController.getSaaSRevenue);
-router.get("/admin/growth", reportController.getGrowthMetrics);
-router.get("/admin/retention", reportController.getRetentionReport);
-router.get("/admin/churn", reportController.getChurnReport);
-router.post("/export", reportController.exportReport);
 
 export default router;

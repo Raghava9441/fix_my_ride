@@ -187,6 +187,14 @@ export class ServiceRecordService {
       .sort({ serviceDate: -1 });
   }
 
+  async findByTechnician(technicianId: string): Promise<any[]> {
+    return ServiceRecord.find({ technicianId, isDeleted: false })
+      .populate("vehicleId", "registrationNumber make model")
+      .populate("serviceCenterId", "name")
+      .populate("ownerId", "firstName lastName")
+      .sort({ serviceDate: -1 });
+  }
+
   async create(input: CreateServiceRecordInput): Promise<any> {
     const vehicle = await Vehicle.findById(input.vehicleId);
     if (!vehicle) {

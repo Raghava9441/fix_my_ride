@@ -1,293 +1,241 @@
-import { Request, Response, NextFunction } from "express";
-import { asyncHandler, createSuccessResponse, HttpStatus } from "../utils";
+import { Request, Response } from "express";
+import { AdminService } from "../services/admin.service";
+import { TenantService } from "../services/tenant.service";
+import { AccountService } from "../services/account.service";
+import { AuditLogService } from "../services/audit.service";
+import { cacheDelPattern } from "../config/redis";
+import {
+  HttpStatus,
+  createSuccessResponse,
+  createErrorResponse,
+  createPaginatedResponse,
+} from "../utils";
 
-export const adminController = {
-  getDashboard: asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => {
-      const result = {
-        totalTenants: 50,
-        totalUsers: 1000,
-        totalVehicles: 500,
-        totalServiceRecords: 2000,
-        revenue: 5000000,
-      };
-      const response = createSuccessResponse(
-        result,
-        "Dashboard data retrieved successfully",
-        HttpStatus.OK,
-      );
-      res.status(response.statusCode).json(response.toJSON());
-    },
-  ),
+export class AdminController {
+  constructor(
+    private readonly adminService: AdminService,
+    private readonly tenantService: TenantService,
+    private readonly accountService: AccountService,
+    private readonly auditLogService: AuditLogService,
+  ) {}
 
-  getSystemStats: asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => {
-      const result = {
-        cpu: "45%",
-        memory: "60%",
-        disk: "70%",
-        uptime: "30 days",
-      };
-      const response = createSuccessResponse(
-        result,
-        "System stats retrieved successfully",
-        HttpStatus.OK,
-      );
-      res.status(response.statusCode).json(response.toJSON());
-    },
-  ),
+  async getDashboard(req: Request, res: Response) {
+    const stats = await this.adminService.getDashboard();
+    const response = createSuccessResponse(stats, "Dashboard data retrieved successfully");
+    return res.status(response.statusCode).json(response.toJSON());
+  }
 
-  getAllTenants: asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => {
-      const result = [
-        { id: "tenant-1", name: "Tenant One", status: "active" },
-        { id: "tenant-2", name: "Tenant Two", status: "active" },
-      ];
-      const response = createSuccessResponse(
-        result,
-        "Tenants retrieved successfully",
-        HttpStatus.OK,
-      );
-      res.status(response.statusCode).json(response.toJSON());
-    },
-  ),
+  async getSystemStats(req: Request, res: Response) {
+    const stats = this.adminService.getSystemStats();
+    const response = createSuccessResponse(stats, "System stats retrieved successfully");
+    return res.status(response.statusCode).json(response.toJSON());
+  }
 
-  createTenant: asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => {
-      const result = { id: "new-tenant-id", ...req.body, status: "active" };
-      const response = createSuccessResponse(
-        result,
-        "Tenant created successfully",
-        HttpStatus.CREATED,
-      );
-      res.status(response.statusCode).json(response.toJSON());
-    },
-  ),
+  async getAllTenants(req: Request, res: Response) {
+    const filters = {
+      page: parseInt(req.query.page as string) || 1,
+      limit: parseInt(req.query.limit as string) || 20,
+    };
+    const result = await this.tenantService.findAll(filters);
 
-  getTenantById: asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => {
-      const result = {
-        id: req.params.id,
-        name: "Tenant One",
-        status: "active",
-      };
-      const response = createSuccessResponse(
-        result,
-        "Tenant retrieved successfully",
-        HttpStatus.OK,
-      );
-      res.status(response.statusCode).json(response.toJSON());
-    },
-  ),
+    const response = createPaginatedResponse(
+      result.data,
+      result.pagination.page,
+      result.pagination.limit,
+      result.pagination.total,
+      "Tenants retrieved successfully",
+    );
+    return res.status(response.statusCode).json(response.toJSON());
+  }
 
-  updateTenant: asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => {
-      const result = { id: req.params.id, ...req.body };
-      const response = createSuccessResponse(
-        result,
-        "Tenant updated successfully",
-        HttpStatus.OK,
-      );
-      res.status(response.statusCode).json(response.toJSON());
-    },
-  ),
+  async createTenant(req: Request, res: Response) {
+    const tenant = await this.tenantService.create(req.body);
+    const response = createSuccessResponse(
+      tenant,
+      "Tenant created successfully",
+      HttpStatus.CREATED,
+    );
+    return res.status(response.statusCode).json(response.toJSON());
+  }
 
-  deleteTenant: asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => {
-      const result = {
-        id: req.params.id,
-        deleted: true,
-        deletedAt: new Date().toISOString(),
-      };
-      const response = createSuccessResponse(
-        result,
-        "Tenant deleted successfully",
-        HttpStatus.OK,
-      );
-      res.status(response.statusCode).json(response.toJSON());
-    },
-  ),
+  async getTenantById(req: Request, res: Response) {
+    const { id } = req.params;
+    const tenant = await this.tenantService.findById(id);
 
-  updateTenantStatus: asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => {
-      const result = { id: req.params.id, status: req.body.status };
-      const response = createSuccessResponse(
-        result,
-        "Tenant status updated successfully",
-        HttpStatus.OK,
-      );
-      res.status(response.statusCode).json(response.toJSON());
-    },
-  ),
+    if (!tenant) {
+      const error = createErrorResponse("Tenant not found", HttpStatus.NOT_FOUND);
+      return res.status(error.statusCode).json(error.toJSON());
+    }
 
-  getAllUsers: asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => {
-      const result = [
-        {
-          id: "user-1",
-          name: "John Doe",
-          email: "john@example.com",
-          role: "owner",
-        },
-        {
-          id: "user-2",
-          name: "Jane Smith",
-          email: "jane@example.com",
-          role: "staff",
-        },
-      ];
-      const response = createSuccessResponse(
-        result,
-        "Users retrieved successfully",
-        HttpStatus.OK,
-      );
-      res.status(response.statusCode).json(response.toJSON());
-    },
-  ),
+    const response = createSuccessResponse(tenant, "Tenant retrieved successfully");
+    return res.status(response.statusCode).json(response.toJSON());
+  }
 
-  suspendUser: asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => {
-      const result = {
-        id: req.params.id,
-        status: "suspended",
-        suspendedAt: new Date().toISOString(),
-      };
-      const response = createSuccessResponse(
-        result,
-        "User suspended successfully",
-        HttpStatus.OK,
-      );
-      res.status(response.statusCode).json(response.toJSON());
-    },
-  ),
+  async updateTenant(req: Request, res: Response) {
+    const { id } = req.params;
+    const tenant = await this.tenantService.update(id, req.body);
 
-  activateUser: asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => {
-      const result = {
-        id: req.params.id,
-        status: "active",
-        activatedAt: new Date().toISOString(),
-      };
-      const response = createSuccessResponse(
-        result,
-        "User activated successfully",
-        HttpStatus.OK,
-      );
-      res.status(response.statusCode).json(response.toJSON());
-    },
-  ),
+    if (!tenant) {
+      const error = createErrorResponse("Tenant not found", HttpStatus.NOT_FOUND);
+      return res.status(error.statusCode).json(error.toJSON());
+    }
 
-  getSystemHealth: asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => {
-      const result = {
-        status: "healthy",
-        database: "connected",
-        cache: "connected",
-        api: "operational",
-      };
-      const response = createSuccessResponse(
-        result,
-        "System health retrieved successfully",
-        HttpStatus.OK,
-      );
-      res.status(response.statusCode).json(response.toJSON());
-    },
-  ),
+    const response = createSuccessResponse(tenant, "Tenant updated successfully");
+    return res.status(response.statusCode).json(response.toJSON());
+  }
 
-  getSystemLogs: asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => {
-      const result = [
-        {
-          level: "info",
-          message: "Server started",
-          timestamp: new Date().toISOString(),
-        },
-        {
-          level: "debug",
-          message: "Connection established",
-          timestamp: new Date().toISOString(),
-        },
-      ];
-      const response = createSuccessResponse(
-        result,
-        "Logs retrieved successfully",
-        HttpStatus.OK,
-      );
-      res.status(response.statusCode).json(response.toJSON());
-    },
-  ),
+  async deleteTenant(req: Request, res: Response) {
+    const { id } = req.params;
+    const tenant = await this.tenantService.delete(id);
 
-  getSystemMetrics: asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => {
-      const result = {
-        requests: { total: 10000, failed: 50 },
-        responseTime: { avg: "120ms", p95: "250ms" },
-      };
-      const response = createSuccessResponse(
-        result,
-        "Metrics retrieved successfully",
-        HttpStatus.OK,
-      );
-      res.status(response.statusCode).json(response.toJSON());
-    },
-  ),
+    if (!tenant) {
+      const error = createErrorResponse("Tenant not found", HttpStatus.NOT_FOUND);
+      return res.status(error.statusCode).json(error.toJSON());
+    }
 
-  clearCache: asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => {
-      const response = createSuccessResponse(
-        null,
-        "Cache cleared successfully",
-        HttpStatus.OK,
-      );
-      res.status(response.statusCode).json(response.toJSON());
-    },
-  ),
+    const response = createSuccessResponse(
+      { id: tenant._id, deleted: true },
+      "Tenant deleted successfully",
+    );
+    return res.status(response.statusCode).json(response.toJSON());
+  }
 
-  reindexSearch: asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => {
-      const response = createSuccessResponse(
-        null,
-        "Search reindexed successfully",
-        HttpStatus.OK,
-      );
-      res.status(response.statusCode).json(response.toJSON());
-    },
-  ),
+  async updateTenantStatus(req: Request, res: Response) {
+    const { id } = req.params;
+    const { isActive } = req.body;
+    const tenant = await this.tenantService.update(id, { isActive } as any);
 
-  createBackup: asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => {
-      const result = { id: "backup-1", status: "completed", size: "500MB" };
-      const response = createSuccessResponse(
-        result,
-        "Backup created successfully",
-        HttpStatus.CREATED,
-      );
-      res.status(response.statusCode).json(response.toJSON());
-    },
-  ),
+    if (!tenant) {
+      const error = createErrorResponse("Tenant not found", HttpStatus.NOT_FOUND);
+      return res.status(error.statusCode).json(error.toJSON());
+    }
 
-  getAuditLogs: asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => {
-      const result = [
-        {
-          id: "log-1",
-          action: "USER_CREATED",
-          userId: "user-1",
-          timestamp: new Date().toISOString(),
-        },
-        {
-          id: "log-2",
-          action: "TENANT_UPDATED",
-          userId: "admin-1",
-          timestamp: new Date().toISOString(),
-        },
-      ];
-      const response = createSuccessResponse(
-        result,
-        "Audit logs retrieved successfully",
-        HttpStatus.OK,
-      );
-      res.status(response.statusCode).json(response.toJSON());
-    },
-  ),
-};
+    const response = createSuccessResponse(
+      { id: tenant._id, isActive: tenant.isActive },
+      "Tenant status updated successfully",
+    );
+    return res.status(response.statusCode).json(response.toJSON());
+  }
+
+  async getAllUsers(req: Request, res: Response) {
+    const filters = {
+      page: parseInt(req.query.page as string) || 1,
+      limit: parseInt(req.query.limit as string) || 20,
+      status: req.query.status as string,
+      tenantId: req.query.tenantId as string,
+    };
+    const result = await this.accountService.findAll(filters);
+
+    const response = createPaginatedResponse(
+      result.data,
+      result.pagination.page,
+      result.pagination.limit,
+      result.pagination.total,
+      "Users retrieved successfully",
+    );
+    return res.status(response.statusCode).json(response.toJSON());
+  }
+
+  async suspendUser(req: Request, res: Response) {
+    const { id } = req.params;
+    const account = await this.accountService.updateStatus(
+      id,
+      "suspended",
+      req.body?.reason,
+    );
+
+    if (!account) {
+      const error = createErrorResponse("User not found", HttpStatus.NOT_FOUND);
+      return res.status(error.statusCode).json(error.toJSON());
+    }
+
+    const response = createSuccessResponse(
+      { id: account._id, status: account.status },
+      "User suspended successfully",
+    );
+    return res.status(response.statusCode).json(response.toJSON());
+  }
+
+  async activateUser(req: Request, res: Response) {
+    const { id } = req.params;
+    const account = await this.accountService.updateStatus(id, "active");
+
+    if (!account) {
+      const error = createErrorResponse("User not found", HttpStatus.NOT_FOUND);
+      return res.status(error.statusCode).json(error.toJSON());
+    }
+
+    const response = createSuccessResponse(
+      { id: account._id, status: account.status },
+      "User activated successfully",
+    );
+    return res.status(response.statusCode).json(response.toJSON());
+  }
+
+  async getSystemHealth(req: Request, res: Response) {
+    const health = await this.adminService.getSystemHealth();
+    const response = createSuccessResponse(health, "System health retrieved successfully");
+    return res.status(response.statusCode).json(response.toJSON());
+  }
+
+  async getSystemLogs(req: Request, res: Response) {
+    const error = createErrorResponse(
+      "Not implemented — no queryable log store exists yet (winston logs to file/console only, see docs/logging.md)",
+      HttpStatus.NOT_IMPLEMENTED,
+    );
+    return res.status(error.statusCode).json(error.toJSON());
+  }
+
+  async getSystemMetrics(req: Request, res: Response) {
+    const error = createErrorResponse(
+      "Not implemented — no request/latency metrics collector is wired up yet",
+      HttpStatus.NOT_IMPLEMENTED,
+    );
+    return res.status(error.statusCode).json(error.toJSON());
+  }
+
+  async clearCache(req: Request, res: Response) {
+    const pattern = (req.body?.pattern as string) || "*";
+    await cacheDelPattern(pattern);
+
+    const response = createSuccessResponse({ pattern }, "Cache cleared successfully");
+    return res.status(response.statusCode).json(response.toJSON());
+  }
+
+  async reindexSearch(req: Request, res: Response) {
+    const error = createErrorResponse(
+      "Not implemented — no search index (Elasticsearch/Algolia/etc.) exists in this codebase",
+      HttpStatus.NOT_IMPLEMENTED,
+    );
+    return res.status(error.statusCode).json(error.toJSON());
+  }
+
+  async createBackup(req: Request, res: Response) {
+    const error = createErrorResponse(
+      "Not implemented — no backup mechanism (e.g. mongodump automation) exists in this codebase",
+      HttpStatus.NOT_IMPLEMENTED,
+    );
+    return res.status(error.statusCode).json(error.toJSON());
+  }
+
+  async getAuditLogs(req: Request, res: Response) {
+    const filters = {
+      page: parseInt(req.query.page as string) || 1,
+      limit: parseInt(req.query.limit as string) || 20,
+      tenantId: req.query.tenantId as string,
+      actorId: req.query.actorId as string,
+      entityType: req.query.entityType as string,
+      action: req.query.action as string,
+    };
+    const result = await this.auditLogService.findAll(filters);
+
+    const response = createPaginatedResponse(
+      result.data,
+      result.pagination.page,
+      result.pagination.limit,
+      result.pagination.total,
+      "Audit logs retrieved successfully",
+    );
+    return res.status(response.statusCode).json(response.toJSON());
+  }
+}

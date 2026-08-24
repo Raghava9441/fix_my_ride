@@ -1,321 +1,461 @@
-import { Request, Response, NextFunction } from "express";
-import { asyncHandler, createSuccessResponse, HttpStatus } from "../utils";
+import { Request, Response } from "express";
+import { ValidatedRequest } from "../middleware/validation.middleware";
+import {
+  ServiceCenterService,
+  CreateServiceCenterInput,
+  UpdateServiceCenterInput,
+} from "../services/serviceCenter.service";
+import {
+  HttpStatus,
+  createSuccessResponse,
+  createErrorResponse,
+  createPaginatedResponse,
+} from "../utils";
 
-export const serviceCenterController = {
-  getAllServiceCenters: asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => {
-      const result = [
-        {
-          id: "center-1",
-          name: "Quick Fix Auto",
-          address: "123 Main St",
-          rating: 4.5,
-        },
-        {
-          id: "center-2",
-          name: "Premium Motors",
-          address: "456 Oak Ave",
-          rating: 4.8,
-        },
-      ];
-      const response = createSuccessResponse(
-        result,
-        "Service centers retrieved successfully",
-        HttpStatus.OK,
+export class ServiceCenterController {
+  constructor(private readonly serviceCenterService: ServiceCenterService) {}
+
+  async getAll(req: Request, res: Response) {
+    const filters = {
+      page: parseInt(req.query.page as string) || 1,
+      limit: parseInt(req.query.limit as string) || 20,
+      tenantId: req.query.tenantId as string,
+      city: req.query.city as string,
+      status: req.query.status as string,
+    };
+
+    const result = await this.serviceCenterService.findAll(filters);
+
+    const response = createPaginatedResponse(
+      result.data,
+      result.pagination.page,
+      result.pagination.limit,
+      result.pagination.total,
+      "Service centers retrieved successfully",
+    );
+    return res.status(response.statusCode).json(response.toJSON());
+  }
+
+  async getNearbyCenters(req: Request, res: Response) {
+    const lat = parseFloat(req.query.lat as string);
+    const lng = parseFloat(req.query.lng as string);
+    const maxDistance = req.query.maxDistance
+      ? parseFloat(req.query.maxDistance as string)
+      : undefined;
+
+    if (Number.isNaN(lat) || Number.isNaN(lng)) {
+      const error = createErrorResponse(
+        "lat and lng query parameters are required",
+        HttpStatus.BAD_REQUEST,
       );
-      res.status(response.statusCode).json(response.toJSON());
-    },
-  ),
+      return res.status(error.statusCode).json(error.toJSON());
+    }
 
-  getNearbyCenters: asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => {
-      const result = [
-        {
-          id: "center-1",
-          name: "Quick Fix Auto",
-          distance: "2.5 km",
-          rating: 4.5,
-        },
-      ];
-      const response = createSuccessResponse(
-        result,
-        "Nearby centers retrieved successfully",
-        HttpStatus.OK,
+    const centers = await this.serviceCenterService.findNearby(
+      lng,
+      lat,
+      maxDistance,
+    );
+
+    const response = createSuccessResponse(
+      centers,
+      "Nearby centers retrieved successfully",
+    );
+    return res.status(response.statusCode).json(response.toJSON());
+  }
+
+  async getById(req: Request, res: Response) {
+    const { id } = req.params;
+
+    const center = await this.serviceCenterService.findById(id);
+
+    if (!center) {
+      const error = createErrorResponse(
+        "Service center not found",
+        HttpStatus.NOT_FOUND,
       );
-      res.status(response.statusCode).json(response.toJSON());
-    },
-  ),
+      return res.status(error.statusCode).json(error.toJSON());
+    }
 
-  getServiceCenterById: asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => {
-      const result = {
-        id: req.params.id,
-        name: "Quick Fix Auto",
-        address: "123 Main St",
-        phone: "+1234567890",
-        rating: 4.5,
-        verified: true,
-      };
-      const response = createSuccessResponse(
-        result,
-        "Service center retrieved successfully",
-        HttpStatus.OK,
-      );
-      res.status(response.statusCode).json(response.toJSON());
-    },
-  ),
+    const response = createSuccessResponse(
+      center,
+      "Service center retrieved successfully",
+    );
+    return res.status(response.statusCode).json(response.toJSON());
+  }
 
-  createServiceCenter: asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => {
-      const result = { id: "new-center-id", ...req.body, status: "active" };
+  async create(req: ValidatedRequest<any>, res: Response) {
+    const data = req.validated;
+
+    const input: CreateServiceCenterInput = {
+      tenantId: data.tenantId,
+      name: data.name,
+      slug: data.slug,
+      businessRegistrationNumber: data.businessRegistrationNumber,
+      email: data.email,
+      phone: data.phone,
+      website: data.website,
+      address: data.address
+        ? {
+            street: data.address.street,
+            city: data.address.city,
+            state: data.address.state,
+            country: data.address.country,
+            postalCode: data.address.postalCode,
+            coordinates: data.address.coordinates
+              ? { type: "Point", coordinates: data.address.coordinates }
+              : undefined,
+          }
+        : undefined,
+      subscription: data.subscription
+        ? {
+            planId: data.subscription.planId,
+            trialEndsAt: data.subscription.trialEndsAt
+              ? new Date(data.subscription.trialEndsAt)
+              : undefined,
+          }
+        : undefined,
+      settings: data.settings,
+      servicesOffered: data.servicesOffered,
+      createdBy: data.createdBy,
+    };
+
+    try {
+      const center = await this.serviceCenterService.create(input);
+
       const response = createSuccessResponse(
-        result,
+        center,
         "Service center created successfully",
         HttpStatus.CREATED,
       );
-      res.status(response.statusCode).json(response.toJSON());
-    },
-  ),
+      return res.status(response.statusCode).json(response.toJSON());
+    } catch (error: any) {
+      if (
+        error.message ===
+        "Service center with this registration number already exists"
+      ) {
+        const apiError = createErrorResponse(
+          error.message,
+          HttpStatus.CONFLICT,
+        );
+        return res.status(apiError.statusCode).json(apiError.toJSON());
+      }
+      if (error.message === "Subscription plan not found") {
+        const apiError = createErrorResponse(
+          error.message,
+          HttpStatus.NOT_FOUND,
+        );
+        return res.status(apiError.statusCode).json(apiError.toJSON());
+      }
+      throw error;
+    }
+  }
 
-  updateServiceCenter: asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => {
-      const result = { id: req.params.id, ...req.body };
-      const response = createSuccessResponse(
-        result,
-        "Service center updated successfully",
-        HttpStatus.OK,
+  async update(req: ValidatedRequest<any>, res: Response) {
+    const { id } = req.params;
+    const data = req.validated;
+
+    const input: UpdateServiceCenterInput = {
+      name: data.name,
+      email: data.email,
+      phone: data.phone,
+      website: data.website,
+      address: data.address
+        ? {
+            street: data.address.street,
+            city: data.address.city,
+            state: data.address.state,
+            country: data.address.country,
+            postalCode: data.address.postalCode,
+            coordinates: data.address.coordinates
+              ? { type: "Point", coordinates: data.address.coordinates }
+              : undefined,
+          }
+        : undefined,
+      settings: data.settings,
+      servicesOffered: data.servicesOffered,
+      subscription: data.subscription
+        ? {
+            status: data.subscription.status,
+            expiresAt: data.subscription.expiresAt
+              ? new Date(data.subscription.expiresAt)
+              : undefined,
+          }
+        : undefined,
+    };
+
+    const center = await this.serviceCenterService.update(id, input);
+
+    if (!center) {
+      const error = createErrorResponse(
+        "Service center not found",
+        HttpStatus.NOT_FOUND,
       );
-      res.status(response.statusCode).json(response.toJSON());
-    },
-  ),
+      return res.status(error.statusCode).json(error.toJSON());
+    }
 
-  deleteServiceCenter: asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => {
-      const result = {
-        id: req.params.id,
+    const response = createSuccessResponse(
+      center,
+      "Service center updated successfully",
+    );
+    return res.status(response.statusCode).json(response.toJSON());
+  }
+
+  async delete(req: Request, res: Response) {
+    const { id } = req.params;
+
+    const center = await this.serviceCenterService.delete(id);
+
+    if (!center) {
+      const error = createErrorResponse(
+        "Service center not found",
+        HttpStatus.NOT_FOUND,
+      );
+      return res.status(error.statusCode).json(error.toJSON());
+    }
+
+    const response = createSuccessResponse(
+      {
+        id: center._id,
         deleted: true,
-        deletedAt: new Date().toISOString(),
-      };
-      const response = createSuccessResponse(
-        result,
-        "Service center deleted successfully",
-        HttpStatus.OK,
-      );
-      res.status(response.statusCode).json(response.toJSON());
-    },
-  ),
+        deletedAt: center.deletedAt,
+      },
+      "Service center deleted successfully",
+    );
+    return res.status(response.statusCode).json(response.toJSON());
+  }
 
-  getCenterVehicles: asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => {
-      const result = [
-        { id: "vehicle-1", registrationNumber: "ABC-1234", make: "Toyota" },
-        { id: "vehicle-2", registrationNumber: "XYZ-5678", make: "Honda" },
-      ];
-      const response = createSuccessResponse(
-        result,
-        "Center vehicles retrieved successfully",
-        HttpStatus.OK,
-      );
-      res.status(response.statusCode).json(response.toJSON());
-    },
-  ),
+  async getCenterVehicles(req: Request, res: Response) {
+    const { id } = req.params;
 
-  getCenterStaff: asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => {
-      const result = [
-        { id: "staff-1", name: "Mike Johnson", role: "Mechanic" },
-        { id: "staff-2", name: "Sarah Williams", role: "Receptionist" },
-      ];
-      const response = createSuccessResponse(
-        result,
-        "Center staff retrieved successfully",
-        HttpStatus.OK,
-      );
-      res.status(response.statusCode).json(response.toJSON());
-    },
-  ),
+    const vehicles = await this.serviceCenterService.getVehicles(id);
 
-  getCenterServices: asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => {
-      const result = [
-        {
-          id: "service-1",
-          name: "Oil Change",
-          price: 5000,
-          duration: "30 min",
-        },
-        {
-          id: "service-2",
-          name: "Tire Rotation",
-          price: 3000,
-          duration: "20 min",
-        },
-      ];
-      const response = createSuccessResponse(
-        result,
-        "Services retrieved successfully",
-        HttpStatus.OK,
-      );
-      res.status(response.statusCode).json(response.toJSON());
-    },
-  ),
+    const response = createSuccessResponse(
+      vehicles,
+      "Center vehicles retrieved successfully",
+    );
+    return res.status(response.statusCode).json(response.toJSON());
+  }
 
-  addService: asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => {
-      const result = { id: "new-service-id", ...req.body };
+  async getCenterStaff(req: Request, res: Response) {
+    const { id } = req.params;
+
+    const staff = await this.serviceCenterService.getStaff(id);
+
+    const response = createSuccessResponse(
+      staff,
+      "Center staff retrieved successfully",
+    );
+    return res.status(response.statusCode).json(response.toJSON());
+  }
+
+  async getCenterServices(req: Request, res: Response) {
+    const { id } = req.params;
+
+    const center = await this.serviceCenterService.findById(id);
+
+    if (!center) {
+      const error = createErrorResponse(
+        "Service center not found",
+        HttpStatus.NOT_FOUND,
+      );
+      return res.status(error.statusCode).json(error.toJSON());
+    }
+
+    const response = createSuccessResponse(
+      center.servicesOffered,
+      "Services retrieved successfully",
+    );
+    return res.status(response.statusCode).json(response.toJSON());
+  }
+
+  async addService(req: ValidatedRequest<any>, res: Response) {
+    const { id } = req.params;
+    const data = req.validated;
+
+    try {
+      const center = await this.serviceCenterService.addService(id, {
+        name: data.name,
+        category: data.category,
+        duration: data.duration,
+        basePrice: data.basePrice,
+      });
+
       const response = createSuccessResponse(
-        result,
+        center.servicesOffered,
         "Service added successfully",
         HttpStatus.CREATED,
       );
-      res.status(response.statusCode).json(response.toJSON());
-    },
-  ),
+      return res.status(response.statusCode).json(response.toJSON());
+    } catch (error: any) {
+      if (error.message === "Service center not found") {
+        const apiError = createErrorResponse(
+          error.message,
+          HttpStatus.NOT_FOUND,
+        );
+        return res.status(apiError.statusCode).json(apiError.toJSON());
+      }
+      throw error;
+    }
+  }
 
-  updateService: asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => {
-      const result = { id: req.params.serviceId, ...req.body };
-      const response = createSuccessResponse(
-        result,
-        "Service updated successfully",
-        HttpStatus.OK,
-      );
-      res.status(response.statusCode).json(response.toJSON());
-    },
-  ),
+  async updateService(req: Request, res: Response) {
+    // The service layer only supports adding a service by name and
+    // removing one by name (ServiceCenterService.addService/removeService);
+    // there is no method to update an existing servicesOffered entry in
+    // place, so this endpoint is not implemented.
+    const error = createErrorResponse(
+      "Updating a service entry in place is not implemented yet",
+      HttpStatus.NOT_IMPLEMENTED,
+    );
+    return res.status(error.statusCode).json(error.toJSON());
+  }
 
-  deleteService: asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => {
-      const result = { id: req.params.serviceId, deleted: true };
-      const response = createSuccessResponse(
-        result,
-        "Service deleted successfully",
-        HttpStatus.OK,
-      );
-      res.status(response.statusCode).json(response.toJSON());
-    },
-  ),
+  async deleteService(req: Request, res: Response) {
+    const { id, serviceId } = req.params;
 
-  getCenterStats: asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => {
-      const result = {
-        totalVehicles: 150,
-        totalServices: 320,
-        revenue: 250000,
-        rating: 4.5,
-      };
-      const response = createSuccessResponse(
-        result,
-        "Stats retrieved successfully",
-        HttpStatus.OK,
-      );
-      res.status(response.statusCode).json(response.toJSON());
-    },
-  ),
+    const center = await this.serviceCenterService.findById(id);
 
-  getCenterReviews: asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => {
-      const result = [
-        { id: "review-1", rating: 5, comment: "Great service!" },
-        { id: "review-2", rating: 4, comment: "Good experience" },
-      ];
-      const response = createSuccessResponse(
-        result,
-        "Reviews retrieved successfully",
-        HttpStatus.OK,
+    if (!center) {
+      const error = createErrorResponse(
+        "Service center not found",
+        HttpStatus.NOT_FOUND,
       );
-      res.status(response.statusCode).json(response.toJSON());
-    },
-  ),
+      return res.status(error.statusCode).json(error.toJSON());
+    }
 
-  addReview: asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => {
-      const result = {
-        id: "new-review-id",
-        ...req.body,
-        createdAt: new Date().toISOString(),
-      };
-      const response = createSuccessResponse(
-        result,
-        "Review added successfully",
-        HttpStatus.CREATED,
-      );
-      res.status(response.statusCode).json(response.toJSON());
-    },
-  ),
+    const serviceEntry = center.servicesOffered.id(serviceId);
 
-  verifyCenter: asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => {
-      const result = {
-        id: req.params.id,
-        verified: true,
-        verifiedAt: new Date().toISOString(),
-      };
-      const response = createSuccessResponse(
-        result,
-        "Center verified successfully",
-        HttpStatus.OK,
+    if (!serviceEntry) {
+      const error = createErrorResponse(
+        "Service not found",
+        HttpStatus.NOT_FOUND,
       );
-      res.status(response.statusCode).json(response.toJSON());
-    },
-  ),
+      return res.status(error.statusCode).json(error.toJSON());
+    }
 
-  uploadDocument: asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => {
-      const result = {
-        id: "doc-id",
-        filename: "document.pdf",
-        url: "/uploads/doc.pdf",
-      };
-      const response = createSuccessResponse(
-        result,
-        "Document uploaded successfully",
-        HttpStatus.CREATED,
-      );
-      res.status(response.statusCode).json(response.toJSON());
-    },
-  ),
+    const updated = await this.serviceCenterService.removeService(
+      id,
+      serviceEntry.name,
+    );
 
-  getDocuments: asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => {
-      const result = [
-        { id: "doc-1", filename: "license.pdf", url: "/uploads/license.pdf" },
-        {
-          id: "doc-2",
-          filename: "insurance.pdf",
-          url: "/uploads/insurance.pdf",
-        },
-      ];
-      const response = createSuccessResponse(
-        result,
-        "Documents retrieved successfully",
-        HttpStatus.OK,
-      );
-      res.status(response.statusCode).json(response.toJSON());
-    },
-  ),
+    const response = createSuccessResponse(
+      {
+        id: serviceId,
+        deleted: true,
+        servicesOffered: updated.servicesOffered,
+      },
+      "Service deleted successfully",
+    );
+    return res.status(response.statusCode).json(response.toJSON());
+  }
 
-  getSettings: asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => {
-      const result = { workingHours: "9AM-6PM", allowOnlineBooking: true };
-      const response = createSuccessResponse(
-        result,
-        "Settings retrieved successfully",
-        HttpStatus.OK,
-      );
-      res.status(response.statusCode).json(response.toJSON());
-    },
-  ),
+  async getCenterStats(req: Request, res: Response) {
+    const { id } = req.params;
 
-  updateSettings: asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => {
-      const result = { id: req.params.id, ...req.body };
-      const response = createSuccessResponse(
-        result,
-        "Settings updated successfully",
-        HttpStatus.OK,
+    const center = await this.serviceCenterService.findById(id);
+
+    if (!center) {
+      const error = createErrorResponse(
+        "Service center not found",
+        HttpStatus.NOT_FOUND,
       );
-      res.status(response.statusCode).json(response.toJSON());
-    },
-  ),
-};
+      return res.status(error.statusCode).json(error.toJSON());
+    }
+
+    const response = createSuccessResponse(
+      center.stats,
+      "Stats retrieved successfully",
+    );
+    return res.status(response.statusCode).json(response.toJSON());
+  }
+
+  async getCenterReviews(req: Request, res: Response) {
+    // No Review model/collection exists in this codebase — ServiceCenter
+    // only carries a single cached stats.averageRating number.
+    const error = createErrorResponse(
+      "Reviews are not implemented yet",
+      HttpStatus.NOT_IMPLEMENTED,
+    );
+    return res.status(error.statusCode).json(error.toJSON());
+  }
+
+  async addReview(req: Request, res: Response) {
+    // Same reason as getCenterReviews: no Review model/collection exists.
+    const error = createErrorResponse(
+      "Reviews are not implemented yet",
+      HttpStatus.NOT_IMPLEMENTED,
+    );
+    return res.status(error.statusCode).json(error.toJSON());
+  }
+
+  async verifyCenter(req: Request, res: Response) {
+    // ServiceCenter has no "verified" field in the schema.
+    const error = createErrorResponse(
+      "Service center verification is not implemented yet",
+      HttpStatus.NOT_IMPLEMENTED,
+    );
+    return res.status(error.statusCode).json(error.toJSON());
+  }
+
+  async uploadDocument(req: Request, res: Response) {
+    // ServiceCenter has no documents field/model backing this endpoint.
+    const error = createErrorResponse(
+      "Document upload is not implemented yet",
+      HttpStatus.NOT_IMPLEMENTED,
+    );
+    return res.status(error.statusCode).json(error.toJSON());
+  }
+
+  async getDocuments(req: Request, res: Response) {
+    // Same reason as uploadDocument: no documents field/model exists.
+    const error = createErrorResponse(
+      "Document listing is not implemented yet",
+      HttpStatus.NOT_IMPLEMENTED,
+    );
+    return res.status(error.statusCode).json(error.toJSON());
+  }
+
+  async getSettings(req: Request, res: Response) {
+    const { id } = req.params;
+
+    const center = await this.serviceCenterService.findById(id);
+
+    if (!center) {
+      const error = createErrorResponse(
+        "Service center not found",
+        HttpStatus.NOT_FOUND,
+      );
+      return res.status(error.statusCode).json(error.toJSON());
+    }
+
+    const response = createSuccessResponse(
+      center.settings,
+      "Settings retrieved successfully",
+    );
+    return res.status(response.statusCode).json(response.toJSON());
+  }
+
+  async updateSettings(req: ValidatedRequest<any>, res: Response) {
+    const { id } = req.params;
+    const data = req.validated;
+
+    const center = await this.serviceCenterService.update(id, {
+      settings: data.settings,
+    });
+
+    if (!center) {
+      const error = createErrorResponse(
+        "Service center not found",
+        HttpStatus.NOT_FOUND,
+      );
+      return res.status(error.statusCode).json(error.toJSON());
+    }
+
+    const response = createSuccessResponse(
+      center.settings,
+      "Settings updated successfully",
+    );
+    return res.status(response.statusCode).json(response.toJSON());
+  }
+}

@@ -1,219 +1,288 @@
-import { Request, Response, NextFunction } from "express";
-import { asyncHandler, createSuccessResponse, HttpStatus } from "../utils";
+import { Request, Response } from "express";
+import { ValidatedRequest } from "../middleware/validation.middleware";
+import {
+  OwnerProfileService,
+  UpdateOwnerProfileInput,
+} from "../services/owner.service";
+import { notificationService } from "../services/notification.service";
+import {
+  HttpStatus,
+  createSuccessResponse,
+  createErrorResponse,
+  createPaginatedResponse,
+} from "../utils";
 
-export const ownerController = {
-  getAllOwners: asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => {
-      const result = [
-        { id: "owner-1", name: "John Doe", email: "john@example.com" },
-        { id: "owner-2", name: "Jane Smith", email: "jane@example.com" },
-      ];
-      const response = createSuccessResponse(
-        result,
-        "Owners retrieved successfully",
-        HttpStatus.OK,
-      );
-      res.status(response.statusCode).json(response.toJSON());
-    },
-  ),
+export class OwnerController {
+  constructor(private readonly ownerService: OwnerProfileService) {}
 
-  getOwnerById: asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => {
-      const result = {
-        id: req.params.id,
-        name: "John Doe",
-        email: "john@example.com",
-        phone: "+1234567890",
-      };
-      const response = createSuccessResponse(
-        result,
-        "Owner retrieved successfully",
-        HttpStatus.OK,
-      );
-      res.status(response.statusCode).json(response.toJSON());
-    },
-  ),
+  async getAll(req: Request, res: Response) {
+    const filters = {
+      page: parseInt(req.query.page as string) || 1,
+      limit: parseInt(req.query.limit as string) || 20,
+    };
 
-  updateOwner: asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => {
-      const result = { id: req.params.id, ...req.body };
-      const response = createSuccessResponse(
-        result,
-        "Owner updated successfully",
-        HttpStatus.OK,
-      );
-      res.status(response.statusCode).json(response.toJSON());
-    },
-  ),
+    const result = await this.ownerService.findAll(filters);
 
-  deleteOwner: asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => {
-      const result = {
-        id: req.params.id,
+    const response = createPaginatedResponse(
+      result.data,
+      result.pagination.page,
+      result.pagination.limit,
+      result.pagination.total,
+      "Owners retrieved successfully",
+    );
+    return res.status(response.statusCode).json(response.toJSON());
+  }
+
+  async getById(req: Request, res: Response) {
+    const { id } = req.params;
+
+    const owner = await this.ownerService.findById(id);
+
+    if (!owner) {
+      const error = createErrorResponse("Owner not found", HttpStatus.NOT_FOUND);
+      return res.status(error.statusCode).json(error.toJSON());
+    }
+
+    const response = createSuccessResponse(
+      owner,
+      "Owner retrieved successfully",
+    );
+    return res.status(response.statusCode).json(response.toJSON());
+  }
+
+  async update(req: ValidatedRequest<any>, res: Response) {
+    const { id } = req.params;
+    const data = req.validated as UpdateOwnerProfileInput;
+
+    const owner = await this.ownerService.update(id, data);
+
+    if (!owner) {
+      const error = createErrorResponse("Owner not found", HttpStatus.NOT_FOUND);
+      return res.status(error.statusCode).json(error.toJSON());
+    }
+
+    const response = createSuccessResponse(
+      owner,
+      "Owner updated successfully",
+    );
+    return res.status(response.statusCode).json(response.toJSON());
+  }
+
+  async delete(req: Request, res: Response) {
+    const { id } = req.params;
+
+    const owner = await this.ownerService.delete(id);
+
+    if (!owner) {
+      const error = createErrorResponse("Owner not found", HttpStatus.NOT_FOUND);
+      return res.status(error.statusCode).json(error.toJSON());
+    }
+
+    const response = createSuccessResponse(
+      {
+        id: owner._id,
         deleted: true,
-        deletedAt: new Date().toISOString(),
-      };
-      const response = createSuccessResponse(
-        result,
-        "Owner deleted successfully",
-        HttpStatus.OK,
-      );
-      res.status(response.statusCode).json(response.toJSON());
-    },
-  ),
+        deletedAt: owner.deletedAt,
+      },
+      "Owner deleted successfully",
+    );
+    return res.status(response.statusCode).json(response.toJSON());
+  }
 
-  getOwnerVehicles: asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => {
-      const result = [
-        {
-          id: "vehicle-1",
-          registrationNumber: "ABC-1234",
-          make: "Toyota",
-          model: "Camry",
-        },
-        {
-          id: "vehicle-2",
-          registrationNumber: "XYZ-5678",
-          make: "Honda",
-          model: "Civic",
-        },
-      ];
+  async getVehicles(req: Request, res: Response) {
+    const { id } = req.params;
+
+    try {
+      const vehicles = await this.ownerService.getVehicles(id);
+
       const response = createSuccessResponse(
-        result,
+        vehicles,
         "Vehicles retrieved successfully",
-        HttpStatus.OK,
       );
-      res.status(response.statusCode).json(response.toJSON());
-    },
-  ),
+      return res.status(response.statusCode).json(response.toJSON());
+    } catch (error: any) {
+      if (error.message === "Owner profile not found") {
+        const apiError = createErrorResponse(
+          "Owner not found",
+          HttpStatus.NOT_FOUND,
+        );
+        return res.status(apiError.statusCode).json(apiError.toJSON());
+      }
+      throw error;
+    }
+  }
 
-  addVehicleToOwner: asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => {
-      const result = {
-        id: "new-vehicle-id",
-        ...req.body,
-        ownerId: req.params.id,
-      };
+  async addVehicle(req: ValidatedRequest<any>, res: Response) {
+    const { id } = req.params;
+    const { vehicleId, isPrimary } = req.validated;
+
+    try {
+      const owner = await this.ownerService.addVehicle(
+        id,
+        vehicleId,
+        isPrimary ?? false,
+      );
+
       const response = createSuccessResponse(
-        result,
+        owner,
         "Vehicle added successfully",
         HttpStatus.CREATED,
       );
-      res.status(response.statusCode).json(response.toJSON());
-    },
-  ),
+      return res.status(response.statusCode).json(response.toJSON());
+    } catch (error: any) {
+      if (error.message === "Owner profile not found") {
+        const apiError = createErrorResponse(
+          "Owner not found",
+          HttpStatus.NOT_FOUND,
+        );
+        return res.status(apiError.statusCode).json(apiError.toJSON());
+      }
+      if (error.message === "Vehicle already added to this owner") {
+        const apiError = createErrorResponse(
+          error.message,
+          HttpStatus.CONFLICT,
+        );
+        return res.status(apiError.statusCode).json(apiError.toJSON());
+      }
+      throw error;
+    }
+  }
 
-  getServiceHistory: asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => {
-      const result = [
-        {
-          id: "record-1",
-          serviceDate: "2024-01-15",
-          serviceType: "oil-change",
-          cost: 5000,
-        },
-        {
-          id: "record-2",
-          serviceDate: "2024-02-20",
-          serviceType: "tire-rotation",
-          cost: 3000,
-        },
-      ];
-      const response = createSuccessResponse(
-        result,
-        "Service history retrieved successfully",
-        HttpStatus.OK,
+  async getServiceHistory(req: Request, res: Response) {
+    const { id } = req.params;
+    const filters = {
+      page: parseInt(req.query.page as string) || 1,
+      limit: parseInt(req.query.limit as string) || 20,
+    };
+
+    const result = await this.ownerService.getServiceHistory(id, filters);
+
+    const response = createPaginatedResponse(
+      result.data,
+      result.pagination.page,
+      result.pagination.limit,
+      result.pagination.total,
+      "Service history retrieved successfully",
+    );
+    return res.status(response.statusCode).json(response.toJSON());
+  }
+
+  async getExpenses(req: Request, res: Response) {
+    const { id } = req.params;
+
+    const expenses = await this.ownerService.getExpenses(id);
+
+    const response = createSuccessResponse(
+      expenses,
+      "Expenses retrieved successfully",
+    );
+    return res.status(response.statusCode).json(response.toJSON());
+  }
+
+  async getNotifications(req: Request, res: Response) {
+    const { id } = req.params;
+
+    const owner = await this.ownerService.findById(id);
+
+    if (!owner) {
+      const error = createErrorResponse("Owner not found", HttpStatus.NOT_FOUND);
+      return res.status(error.statusCode).json(error.toJSON());
+    }
+
+    const page = parseInt(req.query.page as string) || undefined;
+    const limit = req.query.limit
+      ? parseInt(req.query.limit as string)
+      : undefined;
+
+    const options = {
+      limit,
+      skip: page && limit ? (page - 1) * limit : undefined,
+      status: req.query.status as string | undefined,
+      type: req.query.type as string | undefined,
+      channel: req.query.channel as string | undefined,
+      unreadOnly: req.query.unreadOnly === "true",
+    };
+
+    const notifications = await notificationService.findByRecipient(
+      owner.accountId.toString(),
+      "Account",
+      options,
+    );
+
+    const response = createSuccessResponse(
+      notifications,
+      "Notifications retrieved successfully",
+    );
+    return res.status(response.statusCode).json(response.toJSON());
+  }
+
+  async markNotificationRead(req: Request, res: Response) {
+    const { notificationId } = req.params;
+
+    try {
+      const notification = await notificationService.markAsRead(
+        notificationId,
       );
-      res.status(response.statusCode).json(response.toJSON());
-    },
-  ),
 
-  getExpenses: asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => {
-      const result = {
-        total: 8000,
-        currency: "INR",
-        breakdown: { oilChange: 5000, tireRotation: 3000 },
-      };
       const response = createSuccessResponse(
-        result,
-        "Expenses retrieved successfully",
-        HttpStatus.OK,
-      );
-      res.status(response.statusCode).json(response.toJSON());
-    },
-  ),
-
-  getNotifications: asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => {
-      const result = [
-        {
-          id: "notif-1",
-          title: "Service Due",
-          message: "Your vehicle needs service",
-          read: false,
-        },
-        {
-          id: "notif-2",
-          title: "Reminder",
-          message: "Insurance renewal",
-          read: true,
-        },
-      ];
-      const response = createSuccessResponse(
-        result,
-        "Notifications retrieved successfully",
-        HttpStatus.OK,
-      );
-      res.status(response.statusCode).json(response.toJSON());
-    },
-  ),
-
-  markNotificationRead: asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => {
-      const result = { id: req.params.notificationId, read: true };
-      const response = createSuccessResponse(
-        result,
+        notification,
         "Notification marked as read",
-        HttpStatus.OK,
       );
-      res.status(response.statusCode).json(response.toJSON());
-    },
-  ),
+      return res.status(response.statusCode).json(response.toJSON());
+    } catch (error: any) {
+      if (error.message === "Notification not found") {
+        const apiError = createErrorResponse(
+          "Notification not found",
+          HttpStatus.NOT_FOUND,
+        );
+        return res.status(apiError.statusCode).json(apiError.toJSON());
+      }
+      throw error;
+    }
+  }
 
-  deleteNotifications: asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => {
-      const result = { deleted: true, count: 2 };
-      const response = createSuccessResponse(
-        result,
-        "Notifications deleted successfully",
-        HttpStatus.OK,
-      );
-      res.status(response.statusCode).json(response.toJSON());
-    },
-  ),
+  async deleteNotifications(req: Request, res: Response) {
+    const error = createErrorResponse(
+      "Bulk notification deletion is not implemented yet",
+      HttpStatus.NOT_IMPLEMENTED,
+    );
+    return res.status(error.statusCode).json(error.toJSON());
+  }
 
-  getPreferences: asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => {
-      const result = { language: "en", notifications: true, theme: "light" };
-      const response = createSuccessResponse(
-        result,
-        "Preferences retrieved successfully",
-        HttpStatus.OK,
-      );
-      res.status(response.statusCode).json(response.toJSON());
-    },
-  ),
+  async getPreferences(req: Request, res: Response) {
+    const { id } = req.params;
 
-  updatePreferences: asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => {
-      const result = { id: req.params.id, ...req.body };
-      const response = createSuccessResponse(
-        result,
-        "Preferences updated successfully",
-        HttpStatus.OK,
-      );
-      res.status(response.statusCode).json(response.toJSON());
-    },
-  ),
-};
+    const owner = await this.ownerService.findById(id);
+
+    if (!owner) {
+      const error = createErrorResponse("Owner not found", HttpStatus.NOT_FOUND);
+      return res.status(error.statusCode).json(error.toJSON());
+    }
+
+    const response = createSuccessResponse(
+      owner.notificationPreferences,
+      "Preferences retrieved successfully",
+    );
+    return res.status(response.statusCode).json(response.toJSON());
+  }
+
+  async updatePreferences(req: ValidatedRequest<any>, res: Response) {
+    const { id } = req.params;
+    const notificationPreferences = req.validated;
+
+    const owner = await this.ownerService.update(id, {
+      notificationPreferences,
+    });
+
+    if (!owner) {
+      const error = createErrorResponse("Owner not found", HttpStatus.NOT_FOUND);
+      return res.status(error.statusCode).json(error.toJSON());
+    }
+
+    const response = createSuccessResponse(
+      owner.notificationPreferences,
+      "Preferences updated successfully",
+    );
+    return res.status(response.statusCode).json(response.toJSON());
+  }
+}
