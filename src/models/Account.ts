@@ -75,7 +75,6 @@ const accountSchema = new Schema<IAccount, IAccountModel>({
   },
   phone: {
     type: String,
-    sparse: true,
     trim: true
   },
   

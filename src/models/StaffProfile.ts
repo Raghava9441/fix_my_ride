@@ -153,7 +153,6 @@ const staffProfileSchema = new Schema<IStaffProfile, IStaffProfileModel>({
 }, { timestamps: true });
 
 // Indexes
-staffProfileSchema.index({ accountId: 1 });
 staffProfileSchema.index({ serviceCenterId: 1, employmentStatus: 1 });
 staffProfileSchema.index({ roleId: 1 });
 

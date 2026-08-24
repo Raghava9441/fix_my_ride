@@ -152,7 +152,6 @@ const vehicleSchema = new Schema<IVehicle, IVehicleModel>({
 
 // Compound unique per tenant
 vehicleSchema.index({ tenantId: 1, registrationNumber: 1 }, { unique: true, sparse: true });
-vehicleSchema.index({ currentOwnerId: 1 });
 vehicleSchema.index({ 'authorizedServiceCenters.serviceCenterId': 1 });
 
 export const Vehicle = mongoose.model<IVehicle, IVehicleModel>('Vehicle', vehicleSchema);

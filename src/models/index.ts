@@ -17,6 +17,9 @@ import { Payment } from "./Payment";
 import { Document } from "./Document";
 import { Tenant } from "./Tenant";
 import { Notification } from "./Notification";
+import { Reminder } from "./Reminder";
+import { Invoice } from "./Invoice";
+import { Subscription } from "./Subscription";
 
 // Export all models
 export {
@@ -36,4 +39,7 @@ export {
   Document,
   Tenant,
   Notification,
+  Reminder,
+  Invoice,
+  Subscription,
 };

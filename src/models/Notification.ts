@@ -236,7 +236,6 @@ const notificationSchema = new Schema<INotification, INotificationModel>({
     // Expiry
     expiresAt: {
         type: Date,
-        index: true,
         default: function () {
             const expiryDate = new Date();
             expiryDate.setDate(expiryDate.getDate() + 30); // 30 days default expiry
@@ -269,8 +268,7 @@ const notificationSchema = new Schema<INotification, INotificationModel>({
 
     // Batch Information
     batchId: {
-        type: String,
-        index: true
+        type: String
     },
     isBulk: {
         type: Boolean,
