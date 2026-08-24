@@ -1,0 +1,855 @@
+<title>Fix My Ride Data Model</title>
+<style>
+  :root{
+    --bg:#f3efe6;
+    --bg-grid: rgba(27,26,23,0.06);
+    --surface:#fffdf9;
+    --surface-2: rgba(51,80,122,0.05);
+    --ink:#211f1a;
+    --ink-dim:#726c5c;
+    --line:#ddd6c4;
+    --wire:#33507a;
+    --accent:#33507a;
+    --tag-tenant-bg:#e3f0ec; --tag-tenant-fg:#1e6e56;
+    --tag-shared-bg:#fbecd7; --tag-shared-fg:#8f560c;
+    --tag-global-bg:#ece4f7; --tag-global-fg:#5a3fa0;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#171a1f;
+      --bg-grid: rgba(255,255,255,0.05);
+      --surface:#1f232b;
+      --surface-2: rgba(127,160,214,0.07);
+      --ink:#eef0f4;
+      --ink-dim:#99a0b0;
+      --line:#333a46;
+      --wire:#82a3d8;
+      --accent:#82a3d8;
+      --tag-tenant-bg:#152c25; --tag-tenant-fg:#72d6ae;
+      --tag-shared-bg:#392910; --tag-shared-fg:#e5ac60;
+      --tag-global-bg:#282141; --tag-global-fg:#c3b0f2;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#171a1f;
+    --bg-grid: rgba(255,255,255,0.05);
+    --surface:#1f232b;
+    --surface-2: rgba(127,160,214,0.07);
+    --ink:#eef0f4;
+    --ink-dim:#99a0b0;
+    --line:#333a46;
+    --wire:#82a3d8;
+    --accent:#82a3d8;
+    --tag-tenant-bg:#152c25; --tag-tenant-fg:#72d6ae;
+    --tag-shared-bg:#392910; --tag-shared-fg:#e5ac60;
+    --tag-global-bg:#282141; --tag-global-fg:#c3b0f2;
+  }
+
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--bg);
+    background-image:
+      linear-gradient(var(--bg-grid) 1px, transparent 1px),
+      linear-gradient(90deg, var(--bg-grid) 1px, transparent 1px);
+    background-size: 28px 28px;
+    color:var(--ink);
+    font-family: ui-sans-serif, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  .mono{ font-family: ui-monospace, "SFMono-Regular", "JetBrains Mono", Consolas, "Liberation Mono", monospace; }
+
+  .page{ max-width:1240px; margin:0 auto; padding:28px 20px 64px; }
+
+  /* ---------- title block ---------- */
+  .titleblock{
+    display:flex; justify-content:space-between; align-items:flex-end; gap:24px;
+    border-bottom:2px solid var(--ink);
+    padding-bottom:14px; margin-bottom:6px; flex-wrap:wrap;
+  }
+  .titleblock h1{
+    margin:0; font-size:26px; font-weight:700; letter-spacing:0.01em; text-wrap:balance;
+  }
+  .titleblock .sub{
+    margin:6px 0 0; color:var(--ink-dim); font-size:13.5px;
+  }
+  .stamp{
+    border:1px solid var(--line); border-radius:3px; overflow:hidden;
+    font-size:10.5px; min-width:230px;
+  }
+  .stamp .row{ display:flex; }
+  .stamp .row + .row{ border-top:1px solid var(--line); }
+  .stamp .k{
+    flex:0 0 84px; padding:4px 8px; color:var(--ink-dim);
+    text-transform:uppercase; letter-spacing:.05em; background:var(--surface-2);
+    border-right:1px solid var(--line);
+  }
+  .stamp .v{ padding:4px 8px; }
+
+  /* ---------- legend ---------- */
+  .legend{
+    display:flex; flex-wrap:wrap; gap:18px; align-items:center;
+    padding:12px 2px 26px; font-size:12px; color:var(--ink-dim);
+  }
+  .legend .item{ display:flex; align-items:center; gap:7px; }
+  .dot{ width:9px; height:9px; border-radius:50%; flex:none; }
+  .dot.tenant{ background:var(--tag-tenant-fg); }
+  .dot.shared{ background:var(--tag-shared-fg); }
+  .dot.global{ background:var(--tag-global-fg); }
+  .wire-sample{ width:26px; height:0; border-top:1.5px solid var(--wire); }
+
+  /* ---------- canvas ---------- */
+  .canvas-scroll{ overflow-x:auto; padding-bottom:4px; }
+  .canvas{
+    position:relative; min-width:1080px;
+    display:grid; grid-template-columns:1fr 1fr; gap:38px 48px;
+  }
+  .wires{ position:absolute; inset:0; z-index:0; pointer-events:none; overflow:visible; }
+
+  .zone{ position:relative; z-index:1; }
+  .zone.core{ grid-column:1 / -1; }
+  .zone h2{
+    margin:0 0 12px; font-size:11px; font-weight:700; letter-spacing:.09em;
+    text-transform:uppercase; color:var(--accent);
+    display:flex; align-items:center; gap:8px;
+  }
+  .zone h2::after{ content:""; flex:1; height:1px; background:var(--line); }
+  .zone .cards{ display:flex; flex-wrap:wrap; gap:16px; align-items:flex-start; }
+
+  .card{
+    position:relative; z-index:1; background:var(--surface);
+    border:1px solid var(--line); border-left:3px solid var(--ink-dim);
+    border-radius:4px; width:236px; padding:0 0 8px;
+    box-shadow:0 1px 2px rgba(0,0,0,0.04);
+  }
+  .card[data-scope="tenant"]{ border-left-color:var(--tag-tenant-fg); }
+  .card[data-scope="shared"]{ border-left-color:var(--tag-shared-fg); }
+  .card[data-scope="global"]{ border-left-color:var(--tag-global-fg); }
+
+  .card-head{
+    display:flex; align-items:center; justify-content:space-between; gap:8px;
+    padding:9px 10px 8px; border-bottom:1px solid var(--line);
+  }
+  .card-name{ font-weight:700; font-size:13.5px; }
+  .tag{
+    font-size:9px; font-weight:700; letter-spacing:.03em; text-transform:uppercase;
+    padding:2px 6px; border-radius:20px; white-space:nowrap;
+  }
+  .tag.tenant{ background:var(--tag-tenant-bg); color:var(--tag-tenant-fg); }
+  .tag.shared{ background:var(--tag-shared-bg); color:var(--tag-shared-fg); }
+  .tag.global{ background:var(--tag-global-bg); color:var(--tag-global-fg); }
+  .tag.new{ background:var(--wire); color:var(--surface); }
+
+  .fields{ list-style:none; margin:0; padding:6px 10px 0; }
+  .fields li{
+    display:flex; justify-content:space-between; gap:10px;
+    padding:2.5px 0; font-size:11.5px; line-height:1.35;
+  }
+  .fields li.pk .fk{ color:var(--ink-dim); font-style:italic; }
+  .fk{ font-family:ui-monospace, "SFMono-Regular", "JetBrains Mono", Consolas, monospace; white-space:nowrap; }
+  .ftype{ color:var(--ink-dim); text-align:right; white-space:nowrap; }
+  .fref{ color:var(--wire); text-align:right; white-space:nowrap; font-family:ui-monospace, "SFMono-Regular", "JetBrains Mono", Consolas, monospace; }
+  .fref.self{ color:var(--ink-dim); }
+
+  .wire-label{
+    font-size:9.5px; fill:var(--ink-dim);
+    font-family:ui-monospace, "SFMono-Regular", "JetBrains Mono", Consolas, monospace;
+  }
+  .wire-label-bg{ fill:var(--bg); }
+
+  /* ---------- notes ---------- */
+  .notes{
+    margin-top:44px; padding-top:18px; border-top:2px solid var(--ink);
+  }
+  .notes h2{ margin:0 0 12px; font-size:11px; font-weight:700; letter-spacing:.09em; text-transform:uppercase; color:var(--accent); }
+  .notes ol{ margin:0; padding-left:20px; display:grid; gap:11px; }
+  .notes li{ font-size:13px; line-height:1.55; color:var(--ink); }
+  .notes b{ font-weight:700; }
+  .notes code{
+    font-family:ui-monospace, "SFMono-Regular", "JetBrains Mono", Consolas, monospace;
+    background:var(--surface-2); padding:0 4px; border-radius:3px; font-size:12px;
+  }
+
+  .mermaid-wrap{
+    background:var(--surface); border:1px solid var(--line); border-radius:6px;
+    padding:20px; overflow-x:auto;
+  }
+
+  @media (max-width:720px){
+    .titleblock{ align-items:flex-start; }
+  }
+</style>
+
+<div class="page">
+
+  <div class="titleblock">
+    <div>
+      <h1>Fix My Ride — Data Model</h1>
+      <p class="sub">Logical schema map, read directly off <span class="mono">src/models/*.ts</span> — 19 live Mongoose collections.</p>
+    </div>
+    <div class="stamp mono">
+      <div class="row"><div class="k">Drawing</div><div class="v">schema-map v2</div></div>
+      <div class="row"><div class="k">Basis</div><div class="v">Mongoose 8 schemas</div></div>
+      <div class="row"><div class="k">Scope</div><div class="v">logical, not physical</div></div>
+      <div class="row"><div class="k">Updated</div><div class="v">2026-08-24</div></div>
+    </div>
+  </div>
+
+  <div class="legend">
+    <span class="item"><span class="dot tenant"></span> tenant-scoped — auto-filtered by <code class="mono" style="font-size:11px;">tenantId</code> via the Mongoose tenant plugin</span>
+    <span class="item"><span class="dot shared"></span> shared / unscoped — same doc visible to every tenant by design</span>
+    <span class="item"><span class="dot global"></span> global catalog — seeded reference data, no tenant concept</span>
+    <span class="item"><span class="wire-sample"></span> live reference (populate-able)</span>
+    <span class="item"><span class="tag new" style="position:static;">new</span> added 2026-08-24, closing three previously-dangling refs</span>
+  </div>
+
+  <div class="canvas-scroll">
+  <div class="canvas" id="canvas">
+    <svg class="wires" id="wires"></svg>
+
+    <!-- ================= IDENTITY & ACCESS ================= -->
+    <div class="zone" data-zone="identity">
+      <h2>Identity &amp; Access</h2>
+      <div class="cards">
+
+        <div class="card" id="card-Account" data-scope="tenant">
+          <div class="card-head"><span class="card-name">Account</span><span class="tag tenant">tenant</span></div>
+          <ul class="fields">
+            <li class="pk"><span class="fk">_id</span></li>
+            <li><span class="fk">email</span><span class="ftype">unique</span></li>
+            <li><span class="fk">primaryRole</span><span class="ftype">enum</span></li>
+            <li><span class="fk">ownerProfileId</span><span class="fref">→ OwnerProfile</span></li>
+            <li><span class="fk">staffProfileId</span><span class="fref">→ StaffProfile</span></li>
+            <li><span class="fk">tenantId</span><span class="fref">→ Tenant</span></li>
+            <li><span class="fk">status</span><span class="ftype">enum</span></li>
+          </ul>
+        </div>
+
+        <div class="card" id="card-OwnerProfile" data-scope="shared">
+          <div class="card-head"><span class="card-name">OwnerProfile</span><span class="tag shared">shared</span></div>
+          <ul class="fields">
+            <li class="pk"><span class="fk">_id</span></li>
+            <li><span class="fk">accountId</span><span class="fref">→ Account · 1:1</span></li>
+            <li><span class="fk">firstName / lastName</span></li>
+            <li><span class="fk">vehicles[].vehicleId</span><span class="fref">→ Vehicle</span></li>
+            <li><span class="fk">preferredServiceCenterId</span><span class="fref">→ ServiceCenter</span></li>
+            <li><span class="fk">stats.totalSpent</span></li>
+          </ul>
+        </div>
+
+        <div class="card" id="card-StaffProfile" data-scope="tenant">
+          <div class="card-head"><span class="card-name">StaffProfile</span><span class="tag tenant">tenant</span></div>
+          <ul class="fields">
+            <li class="pk"><span class="fk">_id</span></li>
+            <li><span class="fk">accountId</span><span class="fref">→ Account · 1:1</span></li>
+            <li><span class="fk">serviceCenterId</span><span class="fref">→ ServiceCenter</span></li>
+            <li><span class="fk">roleId</span><span class="fref">→ Role</span></li>
+            <li><span class="fk">customPermissions[].permission</span><span class="fref">→ Permission</span></li>
+            <li><span class="fk">deniedPermissions[].permission</span><span class="fref">→ Permission</span></li>
+            <li><span class="fk">employmentStatus</span><span class="ftype">enum</span></li>
+          </ul>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ================= TENANCY & BILLING ================= -->
+    <div class="zone" data-zone="tenancy">
+      <h2>Tenancy &amp; Billing</h2>
+      <div class="cards">
+
+        <div class="card" id="card-Tenant" data-scope="shared">
+          <div class="card-head"><span class="card-name">Tenant</span><span class="tag shared">shared</span></div>
+          <ul class="fields">
+            <li class="pk"><span class="fk">_id</span></li>
+            <li><span class="fk">slug</span><span class="ftype">unique</span></li>
+            <li><span class="fk">subscription.planId</span><span class="fref">→ SubscriptionPlan</span></li>
+            <li><span class="fk">ownerId</span><span class="fref">→ Account</span></li>
+            <li><span class="fk">limits.*</span><span class="ftype">cached from plan</span></li>
+            <li><span class="fk">isActive</span></li>
+          </ul>
+        </div>
+
+        <div class="card" id="card-SubscriptionPlan" data-scope="global">
+          <div class="card-head"><span class="card-name">SubscriptionPlan</span><span class="tag global">global</span></div>
+          <ul class="fields">
+            <li class="pk"><span class="fk">_id</span></li>
+            <li><span class="fk">slug</span><span class="ftype">unique</span></li>
+            <li><span class="fk">type</span><span class="ftype">enum</span></li>
+            <li><span class="fk">limits.maxVehicles/…</span></li>
+            <li><span class="fk">includedPermissions[]</span><span class="fref">→ Permission</span></li>
+          </ul>
+        </div>
+
+        <div class="card" id="card-Payment" data-scope="tenant">
+          <div class="card-head"><span class="card-name">Payment</span><span class="tag tenant">tenant</span></div>
+          <ul class="fields">
+            <li class="pk"><span class="fk">_id</span></li>
+            <li><span class="fk">accountId</span><span class="fref">→ Account</span></li>
+            <li><span class="fk">serviceCenterId</span><span class="fref">→ ServiceCenter</span></li>
+            <li><span class="fk">serviceRecordIds[]</span><span class="fref">→ ServiceRecord</span></li>
+            <li><span class="fk">invoiceId</span><span class="fref">→ Invoice</span></li>
+            <li><span class="fk">subscriptionId</span><span class="fref">→ Subscription</span></li>
+            <li><span class="fk">status</span><span class="ftype">enum</span></li>
+          </ul>
+        </div>
+
+        <div class="card" id="card-Invoice" data-scope="tenant">
+          <div class="card-head"><span class="card-name">Invoice</span><span class="tag tenant">tenant</span><span class="tag new">new</span></div>
+          <ul class="fields">
+            <li class="pk"><span class="fk">_id</span></li>
+            <li><span class="fk">invoiceNumber</span><span class="ftype">unique</span></li>
+            <li><span class="fk">accountId</span><span class="fref">→ Account</span></li>
+            <li><span class="fk">serviceCenterId</span><span class="fref">→ ServiceCenter</span></li>
+            <li><span class="fk">serviceRecordIds[]</span><span class="fref">→ ServiceRecord</span></li>
+            <li><span class="fk">lineItems[]</span></li>
+            <li><span class="fk">status</span><span class="ftype">draft…paid/void</span></li>
+          </ul>
+        </div>
+
+        <div class="card" id="card-Subscription" data-scope="tenant">
+          <div class="card-head"><span class="card-name">Subscription</span><span class="tag tenant">tenant</span><span class="tag new">new</span></div>
+          <ul class="fields">
+            <li class="pk"><span class="fk">_id</span></li>
+            <li><span class="fk">planId</span><span class="fref">→ SubscriptionPlan</span></li>
+            <li><span class="fk">tenantId</span><span class="fref">→ Tenant</span></li>
+            <li><span class="fk">serviceCenterId</span><span class="fref">→ ServiceCenter</span></li>
+            <li><span class="fk">paymentIds[]</span><span class="fref">→ Payment</span></li>
+            <li><span class="fk">status</span><span class="ftype">trialing…cancelled</span></li>
+            <li><span class="fk">currentPeriodEnd</span></li>
+          </ul>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ================= RBAC ================= -->
+    <div class="zone" data-zone="rbac">
+      <h2>RBAC Catalog — Global</h2>
+      <div class="cards">
+
+        <div class="card" id="card-Permission" data-scope="global">
+          <div class="card-head"><span class="card-name">Permission</span><span class="tag global">global</span></div>
+          <ul class="fields">
+            <li class="pk"><span class="fk">_id</span></li>
+            <li><span class="fk">key</span><span class="ftype">"resource:action"</span></li>
+            <li><span class="fk">resource / action</span><span class="ftype">enum</span></li>
+            <li><span class="fk">scope</span><span class="ftype">own/center/tenant/global</span></li>
+          </ul>
+        </div>
+
+        <div class="card" id="card-Role" data-scope="global">
+          <div class="card-head"><span class="card-name">Role</span><span class="tag global">global</span></div>
+          <ul class="fields">
+            <li class="pk"><span class="fk">_id</span></li>
+            <li><span class="fk">slug</span></li>
+            <li><span class="fk">type</span><span class="ftype">system/tenant/custom</span></li>
+            <li><span class="fk">tenantId</span><span class="fref">→ Tenant?</span></li>
+            <li><span class="fk">serviceCenterId</span><span class="fref">→ ServiceCenter?</span></li>
+            <li><span class="fk">permissions[]</span><span class="fref">→ Permission</span></li>
+            <li><span class="fk">inheritsFrom[]</span><span class="fref self">→ Role (self)</span></li>
+          </ul>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ================= CORE OPERATIONS ================= -->
+    <div class="zone core" data-zone="core">
+      <h2>Core Service Operations</h2>
+      <div class="cards">
+
+        <div class="card" id="card-Vehicle" data-scope="shared">
+          <div class="card-head"><span class="card-name">Vehicle</span><span class="tag shared">shared</span></div>
+          <ul class="fields">
+            <li class="pk"><span class="fk">_id</span></li>
+            <li><span class="fk">registrationNumber</span><span class="ftype">unique</span></li>
+            <li><span class="fk">vin</span></li>
+            <li><span class="fk">currentOwnerId</span><span class="fref">→ OwnerProfile</span></li>
+            <li><span class="fk">ownershipHistory[].ownerId</span><span class="fref">→ OwnerProfile</span></li>
+            <li><span class="fk">authorizedServiceCenters[]</span><span class="fref">→ ServiceCenter</span></li>
+            <li><span class="fk">currentOdometer.value</span></li>
+          </ul>
+        </div>
+
+        <div class="card" id="card-ServiceCenter" data-scope="tenant">
+          <div class="card-head"><span class="card-name">ServiceCenter</span><span class="tag tenant">tenant</span></div>
+          <ul class="fields">
+            <li class="pk"><span class="fk">_id</span></li>
+            <li><span class="fk">slug</span><span class="ftype">unique per tenant</span></li>
+            <li><span class="fk">tenantId</span><span class="fref">→ Tenant</span></li>
+            <li><span class="fk">subscription.planId</span><span class="fref">→ SubscriptionPlan</span></li>
+            <li><span class="fk">createdBy</span><span class="fref">→ StaffProfile</span></li>
+            <li><span class="fk">servicesOffered[]</span></li>
+          </ul>
+        </div>
+
+        <div class="card" id="card-ServiceRecord" data-scope="tenant">
+          <div class="card-head"><span class="card-name">ServiceRecord</span><span class="tag tenant">tenant</span></div>
+          <ul class="fields">
+            <li class="pk"><span class="fk">_id</span></li>
+            <li><span class="fk">vehicleId</span><span class="fref">→ Vehicle</span></li>
+            <li><span class="fk">serviceCenterId</span><span class="fref">→ ServiceCenter</span></li>
+            <li><span class="fk">technicianId</span><span class="fref">→ StaffProfile</span></li>
+            <li><span class="fk">ownerId</span><span class="fref">→ OwnerProfile</span></li>
+            <li><span class="fk">createdBy.accountId</span><span class="fref">→ Account</span></li>
+            <li><span class="fk">cost.total</span></li>
+          </ul>
+        </div>
+
+        <div class="card" id="card-OdometerReading" data-scope="tenant">
+          <div class="card-head"><span class="card-name">OdometerReading</span><span class="tag tenant">tenant</span></div>
+          <ul class="fields">
+            <li class="pk"><span class="fk">_id</span></li>
+            <li><span class="fk">vehicleId</span><span class="fref">→ Vehicle</span></li>
+            <li><span class="fk">value / unit</span></li>
+            <li><span class="fk">recordedBy</span><span class="ftype">refPath: 4 models</span></li>
+            <li><span class="fk">verifiedBy</span><span class="fref">→ StaffProfile</span></li>
+          </ul>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ================= SUPPORTING RECORDS ================= -->
+    <div class="zone" data-zone="support">
+      <h2>Supporting Records</h2>
+      <div class="cards">
+
+        <div class="card" id="card-Invitation" data-scope="tenant">
+          <div class="card-head"><span class="card-name">Invitation</span><span class="tag tenant">tenant</span></div>
+          <ul class="fields">
+            <li class="pk"><span class="fk">_id</span></li>
+            <li><span class="fk">inviterId</span><span class="ftype">refPath: 4 models</span></li>
+            <li><span class="fk">vehicleId</span><span class="fref">→ Vehicle</span></li>
+            <li><span class="fk">serviceCenterId</span><span class="fref">→ ServiceCenter</span></li>
+            <li><span class="fk">token</span><span class="ftype">unique</span></li>
+            <li><span class="fk">status</span><span class="ftype">enum</span></li>
+          </ul>
+        </div>
+
+        <div class="card" id="card-Document" data-scope="tenant">
+          <div class="card-head"><span class="card-name">Document</span><span class="tag tenant">tenant</span></div>
+          <ul class="fields">
+            <li class="pk"><span class="fk">_id</span></li>
+            <li><span class="fk">accountId</span><span class="fref">→ Account</span></li>
+            <li><span class="fk">entityType / entityId</span><span class="ftype">polymorphic</span></li>
+            <li><span class="fk">verifiedBy</span><span class="fref">→ StaffProfile</span></li>
+            <li><span class="fk">allowedAccounts[]</span><span class="fref">→ Account</span></li>
+            <li><span class="fk">status</span><span class="ftype">enum</span></li>
+          </ul>
+        </div>
+
+        <div class="card" id="card-Reminder" data-scope="tenant">
+          <div class="card-head"><span class="card-name">Reminder</span><span class="tag tenant">tenant</span><span class="tag new">new</span></div>
+          <ul class="fields">
+            <li class="pk"><span class="fk">_id</span></li>
+            <li><span class="fk">ownerId</span><span class="fref">→ OwnerProfile</span></li>
+            <li><span class="fk">vehicleId</span><span class="fref">→ Vehicle</span></li>
+            <li><span class="fk">serviceRecordId</span><span class="fref">→ ServiceRecord</span></li>
+            <li><span class="fk">staffId</span><span class="fref">→ StaffProfile</span></li>
+            <li><span class="fk">type</span><span class="ftype">service/insurance/…</span></li>
+            <li><span class="fk">status</span><span class="ftype">pending…completed</span></li>
+          </ul>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ================= NOTIFICATIONS & AUDIT ================= -->
+    <div class="zone" data-zone="notif">
+      <h2>Notifications &amp; Audit</h2>
+      <div class="cards">
+
+        <div class="card" id="card-Notification" data-scope="tenant">
+          <div class="card-head"><span class="card-name">Notification</span><span class="tag tenant">tenant</span></div>
+          <ul class="fields">
+            <li class="pk"><span class="fk">_id</span></li>
+            <li><span class="fk">recipientId</span><span class="ftype">refPath: Account/ServiceCenter</span></li>
+            <li><span class="fk">data.vehicleId</span><span class="fref">→ Vehicle</span></li>
+            <li><span class="fk">data.serviceRecordId</span><span class="fref">→ ServiceRecord</span></li>
+            <li><span class="fk">data.reminderId</span><span class="fref">→ Reminder</span></li>
+            <li><span class="fk">channel / status</span></li>
+          </ul>
+        </div>
+
+        <div class="card" id="card-AuditLog" data-scope="tenant">
+          <div class="card-head"><span class="card-name">AuditLog</span><span class="tag tenant">tenant</span></div>
+          <ul class="fields">
+            <li class="pk"><span class="fk">_id</span></li>
+            <li><span class="fk">actorId</span><span class="fref">→ Account</span></li>
+            <li><span class="fk">entityType / entityId</span><span class="ftype">polymorphic</span></li>
+            <li><span class="fk">action</span><span class="ftype">enum</span></li>
+            <li><span class="fk">recordedAt</span><span class="ftype">TTL · 2y</span></li>
+          </ul>
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+  </div>
+
+  <div class="notes">
+    <h2>Reading the wiring</h2>
+    <ol>
+      <li><b>Three collections are deliberately shared, not tenant-scoped:</b> <code>Vehicle</code>, <code>OwnerProfile</code>, and <code>Tenant</code> itself. A single vehicle can be serviced by staff from several different tenants — the isolation boundary for it is <code>authorizedServiceCenters[]</code>, not <code>tenantId</code>.</li>
+      <li><b><code>Permission</code>, <code>SubscriptionPlan</code>, and <code>Role</code> are global catalogs</b>, seeded once and read by every tenant — closer to static reference tables than to per-tenant business data. (They had briefly picked up tenant scoping by mistake, which silently broke permission/plan lookups for any real request — since reverted.)</li>
+      <li><b><code>Reminder</code>, <code>Invoice</code>, and <code>Subscription</code> were added 2026-08-24</b> to close out three <code>ref</code>/<code>refPath</code> fields (on <code>Notification</code>, <code>OwnerProfile</code>, and <code>Payment</code>) that previously pointed at collections with no model file — those <code>populate()</code> calls would have thrown <code>MissingSchemaError</code> the moment anyone used them. Note <code>Subscription</code> is distinct from <code>SubscriptionPlan</code>: the plan is the catalog of what can be bought, the subscription is a purchased billing-period instance.</li>
+      <li><b>A vehicle's mileage is tracked in three independent places</b> — <code>Vehicle.currentOdometer</code>, the embedded snapshot on each <code>ServiceRecord</code>, and the standalone <code>OdometerReading</code> collection — with no schema-level mechanism keeping them in sync; whatever service code writes them is the only source of truth for consistency.</li>
+    </ol>
+  </div>
+
+  <div class="notes" style="margin-top:36px;">
+    <h2>Entity-Relationship Diagram</h2>
+    <p style="margin:0 0 16px; font-size:13px; color:var(--ink-dim); line-height:1.5; max-width:70ch;">
+      Same 19 collections, conventional crow's-foot notation — cardinalities read directly off each field's
+      <code>required</code> / <code>unique</code> flags rather than assumed.
+    </p>
+    <div class="mermaid-wrap">
+<pre class="mermaid">
+erDiagram
+    ACCOUNT {
+        ObjectId _id PK
+        string email UK
+        string primaryRole
+        ObjectId tenantId FK
+        string status
+    }
+    OWNERPROFILE {
+        ObjectId _id PK
+        ObjectId accountId FK
+        string firstName
+        string lastName
+        ObjectId preferredServiceCenterId FK
+    }
+    STAFFPROFILE {
+        ObjectId _id PK
+        ObjectId accountId FK
+        ObjectId serviceCenterId FK
+        ObjectId roleId FK
+        string employmentStatus
+    }
+    TENANT {
+        ObjectId _id PK
+        string slug UK
+        ObjectId ownerId FK
+        boolean isActive
+    }
+    SUBSCRIPTIONPLAN {
+        ObjectId _id PK
+        string slug UK
+        string type
+        number price
+    }
+    PERMISSION {
+        ObjectId _id PK
+        string key UK
+        string resource
+        string action
+        string scope
+    }
+    ROLE {
+        ObjectId _id PK
+        string slug
+        string type
+        ObjectId tenantId FK
+        ObjectId serviceCenterId FK
+        number level
+    }
+    VEHICLE {
+        ObjectId _id PK
+        string registrationNumber UK
+        string vin
+        ObjectId currentOwnerId FK
+    }
+    SERVICECENTER {
+        ObjectId _id PK
+        string slug
+        ObjectId tenantId FK
+        ObjectId createdBy FK
+    }
+    SERVICERECORD {
+        ObjectId _id PK
+        ObjectId vehicleId FK
+        ObjectId serviceCenterId FK
+        ObjectId technicianId FK
+        ObjectId ownerId FK
+        number costTotal
+    }
+    ODOMETERREADING {
+        ObjectId _id PK
+        ObjectId vehicleId FK
+        number value
+        string source
+    }
+    INVITATION {
+        ObjectId _id PK
+        ObjectId vehicleId FK
+        ObjectId serviceCenterId FK
+        string token UK
+        string status
+    }
+    DOCUMENT {
+        ObjectId _id PK
+        ObjectId accountId FK
+        string entityType
+        ObjectId entityId
+        string status
+    }
+    NOTIFICATION {
+        ObjectId _id PK
+        ObjectId recipientId FK
+        string recipientModel
+        string channel
+        string status
+    }
+    AUDITLOG {
+        ObjectId _id PK
+        ObjectId actorId FK
+        string action
+        string entityType
+        date recordedAt
+    }
+    PAYMENT {
+        ObjectId _id PK
+        ObjectId accountId FK
+        ObjectId serviceCenterId FK
+        number totalAmount
+        string status
+    }
+    REMINDER {
+        ObjectId _id PK
+        ObjectId ownerId FK
+        ObjectId vehicleId FK
+        string type
+        date dueDate
+        string status
+    }
+    INVOICE {
+        ObjectId _id PK
+        string invoiceNumber UK
+        ObjectId accountId FK
+        ObjectId serviceCenterId FK
+        number totalAmount
+        number amountDue
+        string status
+    }
+    SUBSCRIPTION {
+        ObjectId _id PK
+        ObjectId planId FK
+        ObjectId tenantId FK
+        string status
+        date currentPeriodEnd
+    }
+
+    ACCOUNT ||--o| OWNERPROFILE : "accountId"
+    ACCOUNT ||--o| STAFFPROFILE : "accountId"
+    TENANT |o--o{ ACCOUNT : "tenantId"
+    ACCOUNT }o--o| TENANT : "ownerId"
+    SUBSCRIPTIONPLAN ||--o{ TENANT : "subscription.planId"
+    SUBSCRIPTIONPLAN ||--o{ SERVICECENTER : "subscription.planId"
+    SUBSCRIPTIONPLAN }o--o{ PERMISSION : "includedPermissions[]"
+    SERVICECENTER ||--o{ STAFFPROFILE : "serviceCenterId"
+    ROLE ||--o{ STAFFPROFILE : "roleId"
+    ROLE }o--o{ PERMISSION : "permissions[]"
+    ROLE }o--o{ ROLE : "inheritsFrom[]"
+    OWNERPROFILE ||--o{ VEHICLE : "currentOwnerId"
+    SERVICECENTER }o--o{ VEHICLE : "authorizedServiceCenters[]"
+    TENANT |o--o{ SERVICECENTER : "tenantId"
+    VEHICLE ||--o{ SERVICERECORD : "vehicleId"
+    SERVICECENTER ||--o{ SERVICERECORD : "serviceCenterId"
+    STAFFPROFILE |o--o{ SERVICERECORD : "technicianId"
+    OWNERPROFILE ||--o{ SERVICERECORD : "ownerId"
+    VEHICLE ||--o{ ODOMETERREADING : "vehicleId"
+    VEHICLE |o--o{ INVITATION : "vehicleId"
+    SERVICECENTER |o--o{ INVITATION : "serviceCenterId"
+    ACCOUNT |o--o{ DOCUMENT : "accountId"
+    ACCOUNT ||--o{ NOTIFICATION : "recipientId"
+    ACCOUNT ||--o{ AUDITLOG : "actorId"
+    ACCOUNT ||--o{ PAYMENT : "accountId"
+    SERVICECENTER |o--o{ PAYMENT : "serviceCenterId"
+    SERVICERECORD }o--o{ PAYMENT : "serviceRecordIds[]"
+    OWNERPROFILE |o--o{ REMINDER : "ownerId"
+    VEHICLE |o--o{ REMINDER : "vehicleId"
+    REMINDER |o--o{ NOTIFICATION : "data.reminderId"
+    ACCOUNT ||--o{ INVOICE : "accountId"
+    SERVICECENTER |o--o{ INVOICE : "serviceCenterId"
+    INVOICE |o--o{ PAYMENT : "invoiceId"
+    SUBSCRIPTIONPLAN ||--o{ SUBSCRIPTION : "planId"
+    TENANT |o--o{ SUBSCRIPTION : "tenantId"
+    SUBSCRIPTION |o--o{ PAYMENT : "subscriptionId"
+</pre>
+    </div>
+  </div>
+
+</div>
+
+<script>
+(function(){
+  var canvas = document.getElementById('canvas');
+  var svg = document.getElementById('wires');
+  var NS = 'http://www.w3.org/2000/svg';
+
+  var rels = [
+    ['Account','OwnerProfile','1:1 accountId'],
+    ['Account','StaffProfile','1:1 accountId'],
+    ['Account','Tenant','tenantId'],
+    ['Tenant','SubscriptionPlan','subscription.planId'],
+    ['Tenant','Account','ownerId'],
+    ['SubscriptionPlan','Permission','includedPermissions[]'],
+    ['StaffProfile','ServiceCenter','serviceCenterId'],
+    ['StaffProfile','Role','roleId'],
+    ['Role','Permission','permissions[]'],
+    ['Vehicle','OwnerProfile','currentOwnerId'],
+    ['OwnerProfile','Vehicle','vehicles[]'],
+    ['Vehicle','ServiceCenter','authorizedServiceCenters[]'],
+    ['ServiceCenter','SubscriptionPlan','subscription.planId'],
+    ['ServiceRecord','Vehicle','vehicleId'],
+    ['ServiceRecord','ServiceCenter','serviceCenterId'],
+    ['ServiceRecord','StaffProfile','technicianId'],
+    ['ServiceRecord','OwnerProfile','ownerId'],
+    ['OdometerReading','Vehicle','vehicleId'],
+    ['Invitation','Vehicle','vehicleId'],
+    ['Invitation','ServiceCenter','serviceCenterId'],
+    ['Document','Account','accountId'],
+    ['Notification','Account','recipientId'],
+    ['Notification','Vehicle','data.vehicleId'],
+    ['AuditLog','Account','actorId'],
+    ['Payment','Account','accountId'],
+    ['Payment','ServiceCenter','serviceCenterId'],
+    ['Payment','Invoice','invoiceId'],
+    ['Payment','Subscription','subscriptionId'],
+    ['Notification','Reminder','data.reminderId'],
+    ['Reminder','OwnerProfile','ownerId'],
+    ['Reminder','Vehicle','vehicleId'],
+    ['Invoice','Account','accountId'],
+    ['Invoice','ServiceCenter','serviceCenterId'],
+    ['Subscription','SubscriptionPlan','planId'],
+    ['Subscription','Tenant','tenantId']
+  ];
+
+  function rectOf(name){
+    var el = document.getElementById('card-' + name);
+    if (!el) return null;
+    var r = el.getBoundingClientRect();
+    var c = canvas.getBoundingClientRect();
+    return {
+      left:r.left - c.left, top:r.top - c.top,
+      right:r.right - c.left, bottom:r.bottom - c.top,
+      cx:(r.left + r.right) / 2 - c.left, cy:(r.top + r.bottom) / 2 - c.top
+    };
+  }
+
+  function anchors(a, b){
+    var dx = b.cx - a.cx, dy = b.cy - a.cy;
+    if (Math.abs(dx) > Math.abs(dy)) {
+      return dx > 0
+        ? [{x:a.right, y:a.cy}, {x:b.left, y:b.cy}]
+        : [{x:a.left, y:a.cy}, {x:b.right, y:b.cy}];
+    }
+    return dy > 0
+      ? [{x:a.cx, y:a.bottom}, {x:b.cx, y:b.top}]
+      : [{x:a.cx, y:a.top}, {x:b.cx, y:b.bottom}];
+  }
+
+  function draw(){
+    while (svg.firstChild) svg.removeChild(svg.firstChild);
+    var canvasRect = canvas.getBoundingClientRect();
+    svg.setAttribute('width', canvasRect.width);
+    svg.setAttribute('height', canvasRect.height);
+    svg.setAttribute('viewBox', '0 0 ' + canvasRect.width + ' ' + canvasRect.height);
+
+    var style = getComputedStyle(document.documentElement);
+    var wireColor = style.getPropertyValue('--wire').trim();
+    var bgColor = style.getPropertyValue('--bg').trim();
+    var labelColor = style.getPropertyValue('--ink-dim').trim();
+
+    var counts = {};
+
+    rels.forEach(function(rel){
+      var a = rectOf(rel[0]), b = rectOf(rel[1]);
+      if (!a || !b) return;
+      var pts = anchors(a, b);
+      var p1 = pts[0], p2 = pts[1];
+
+      var pairKey = rel[0] < rel[1] ? rel[0] + '|' + rel[1] : rel[1] + '|' + rel[0];
+      counts[pairKey] = (counts[pairKey] || 0) + 1;
+      var fan = (counts[pairKey] - 1) * 9 * (counts[pairKey] % 2 === 0 ? -1 : 1);
+
+      var mx = (p1.x + p2.x) / 2, my = (p1.y + p2.y) / 2;
+      var dx = p2.x - p1.x, dy = p2.y - p1.y;
+      var len = Math.sqrt(dx * dx + dy * dy) || 1;
+      var nx = -dy / len, ny = dx / len;
+      var ctrl = {x: mx + nx * fan, y: my + ny * fan};
+
+      var ang = Math.atan2(p2.y - ctrl.y, p2.x - ctrl.x);
+      var p2adj = {x: p2.x - 9 * Math.cos(ang), y: p2.y - 9 * Math.sin(ang)};
+
+      var path = document.createElementNS(NS, 'path');
+      path.setAttribute('d', 'M ' + p1.x + ' ' + p1.y + ' Q ' + ctrl.x + ' ' + ctrl.y + ' ' + p2adj.x + ' ' + p2adj.y);
+      path.setAttribute('fill', 'none');
+      path.setAttribute('stroke', wireColor);
+      path.setAttribute('stroke-width', '1.3');
+      path.setAttribute('opacity', '0.6');
+      svg.appendChild(path);
+
+      var arrow = document.createElementNS(NS, 'polygon');
+      arrow.setAttribute('points', '0,0 -8,-3.5 -8,3.5');
+      arrow.setAttribute('fill', wireColor);
+      arrow.setAttribute('opacity', '0.75');
+      arrow.setAttribute('transform', 'translate(' + p2.x + ',' + p2.y + ') rotate(' + (ang * 180 / Math.PI) + ')');
+      svg.appendChild(arrow);
+
+      var lx = 0.25 * p1.x + 0.5 * ctrl.x + 0.25 * p2adj.x;
+      var ly = 0.25 * p1.y + 0.5 * ctrl.y + 0.25 * p2adj.y;
+      var label = rel[2];
+      var w = Math.max(20, label.length * 5.3);
+
+      var bgRect = document.createElementNS(NS, 'rect');
+      bgRect.setAttribute('x', lx - w / 2);
+      bgRect.setAttribute('y', ly - 7);
+      bgRect.setAttribute('width', w);
+      bgRect.setAttribute('height', 11);
+      bgRect.setAttribute('fill', bgColor);
+      bgRect.setAttribute('opacity', '0.88');
+      svg.appendChild(bgRect);
+
+      var text = document.createElementNS(NS, 'text');
+      text.setAttribute('x', lx);
+      text.setAttribute('y', ly + 3);
+      text.setAttribute('text-anchor', 'middle');
+      text.setAttribute('font-size', '9.5');
+      text.setAttribute('fill', labelColor);
+      text.setAttribute('font-family', 'ui-monospace, SFMono-Regular, "JetBrains Mono", Consolas, monospace');
+      text.textContent = label;
+      svg.appendChild(text);
+    });
+  }
+
+  window.addEventListener('load', draw);
+  window.addEventListener('resize', function(){
+    clearTimeout(window.__wireT);
+    window.__wireT = setTimeout(draw, 120);
+  });
+  if (window.matchMedia) {
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function(){ setTimeout(draw, 60); });
+  }
+  setTimeout(draw, 50);
+})();
+</script>
+
+<!--
+  This page is a plain static file opened directly in a browser (not the
+  Claude Artifact viewer, which renders `.mermaid` blocks natively) — so the
+  ER diagram needs the actual Mermaid runtime to turn into a picture. Pinned
+  CDN version rather than vendoring the ~1MB bundle into the repo.
+-->
+<script type="module">
+  import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.esm.min.mjs";
+  mermaid.initialize({
+    startOnLoad: true,
+    securityLevel: "strict",
+    theme: window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "default",
+  });
+</script>
