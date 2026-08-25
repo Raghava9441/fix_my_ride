@@ -9,6 +9,15 @@
 # internal DNS), not `localhost` — that's why MONGODB_URI/REDIS_HOST are
 # overridden below even though .env.development points at localhost for
 # native (non-Docker) `npm run dev` usage.
+#
+# `mongo` runs as a single-node replica set (`rs0`), not a plain standalone
+# instance — Mongoose transactions (used by the org-onboarding signup flow
+# and the admin seed script, both of which create several documents
+# atomically) require a replica set to work at all; a standalone mongod
+# rejects `startSession()`/transactions outright. `mongo-init` is a one-shot
+# container that runs `rs.initiate()` once mongo is up (idempotent — safe on
+# every `docker-compose up`), and `app` waits for it to finish before
+# starting.
 
 services:
   app:
@@ -27,7 +36,7 @@ services:
     env_file:
       - .env.development
     environment:
-      MONGODB_URI: mongodb://mongo:27017/fix_my_ride
+      MONGODB_URI: mongodb://mongo:27017/fix_my_ride?replicaSet=rs0
       REDIS_HOST: redis
       REDIS_PORT: 6379
     volumes:
@@ -35,6 +44,8 @@ services:
     depends_on:
       mongo:
         condition: service_healthy
+      mongo-init:
+        condition: service_completed_successfully
       redis:
         condition: service_healthy
     networks:
@@ -44,6 +55,7 @@ services:
     image: mongo:7
     container_name: fix-my-ride-mongo
     restart: unless-stopped
+    command: ["--replSet", "rs0", "--bind_ip_all"]
     ports:
       - "27017:27017"
     volumes:
@@ -56,6 +68,21 @@ services:
       start_period: 10s
     networks:
       - fix-my-ride-net
+
+  # One-shot: initiates the rs0 replica set once `mongo` is reachable, then
+  # exits. Safe to re-run — no-ops if the replica set already exists.
+  mongo-init:
+    image: mongo:7
+    container_name: fix-my-ride-mongo-init
+    restart: "no"
+    depends_on:
+      mongo:
+        condition: service_healthy
+    networks:
+      - fix-my-ride-net
+    command: >
+      mongosh --host mongo:27017 --quiet --eval
+      "try { rs.status(); print('rs0 already initiated'); } catch (e) { print('initiating rs0...'); rs.initiate({ _id: 'rs0', members: [{ _id: 0, host: 'mongo:27017' }] }); }"
 
   redis:
     image: redis:7-alpine

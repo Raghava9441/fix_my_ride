@@ -14,9 +14,11 @@ Quick-start commands are in [README.md](../README.md) — this doc covers the sa
 
 ## Compose stack
 
-`docker-compose.yml` runs `app` + `mongo` (7) + `redis` (7-alpine), each with a healthcheck and a named volume (`mongo-data`, `redis-data`, `uploads-data`). Two details worth knowing:
+`docker-compose.yml` runs `app` + `mongo` (7) + `mongo-init` + `redis` (7-alpine), each with a healthcheck and a named volume (`mongo-data`, `redis-data`, `uploads-data`). Details worth knowing:
 - The `app` service's `MONGODB_URI`/`REDIS_HOST` are **overridden** to point at the `mongo`/`redis` service names (Docker's internal DNS) even though `.env.development` (loaded via `env_file` for everything else) points at `localhost` — that's intentional, `localhost` inside the `app` container would mean the container itself, not the sibling `mongo` container.
 - The `app` service declares both `build:` (used for local `docker-compose up --build`) **and** `image: ${IMAGE_NAME:-fix-my-ride-app}:${IMAGE_TAG:-latest}` (used on a server via `docker compose pull`, once CI has pushed a real image there). Don't remove either half — they serve different environments off the same file.
+- **`mongo` runs as a single-node replica set (`rs0`)**, not a plain standalone `mongod` — `mongo-init` is a one-shot container that runs `rs.initiate()` once (idempotent, safe on every `up`), and `app` waits for it (`condition: service_completed_successfully`) before starting. This is required, not cosmetic: Mongoose transactions (`mongoose.startSession()`) — used by the org-onboarding signup flow and `src/seeds/admin.seed.ts`, both of which create several documents atomically — throw immediately against a standalone `mongod`. `MONGODB_URI` for the `app` service includes `?replicaSet=rs0` accordingly.
+- **If you run MongoDB natively instead of via this compose file** (`npm run dev` against a locally-installed `mongod`, not `docker-compose up`), you need to initiate a replica set yourself for the same reason — a stock `brew install mongodb-community` / `apt install mongodb` setup is standalone by default. Either add `replication.replSetName: rs0` to your local `mongod.conf` (or `--replSet rs0` on the command line) and run `mongosh --eval "rs.initiate()"` once, or point `MONGODB_URI` at an already-replica-set-backed instance (e.g. a free MongoDB Atlas cluster, which is always a replica set). Signup/seeding will fail with a "Transaction numbers are only allowed on a replica set member or mongos" error otherwise.
 
 ## CI/CD (`.github/workflows/ci-cd.yml`)
 

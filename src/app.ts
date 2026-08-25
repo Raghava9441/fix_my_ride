@@ -22,6 +22,7 @@ import { requestContext } from "./middleware/requestContext.middleware";
 import { tenantIsolation } from "./middleware/tenant.middleware";
 import { auditLogger } from "./middleware/audit.middleware";
 import { requestSanitizer } from "./middleware/sanitizer.middleware";
+import { authenticateOptional } from "./middleware/auth.middleware";
 
 // Import routes
 import authRoutes from "./routes/auth.routes";
@@ -156,6 +157,19 @@ app.use(requestSanitizer); // XSS protection
 // ========================================
 // Tenant Context Middleware
 // ========================================
+// authenticateOptional must run before tenantIsolation: tenantIsolation
+// resolves the active tenant primarily from req.user.tenantId (set by a
+// valid JWT), but every route applies its own *required* `authenticate`
+// much later (inside its own router, after this global chain). Without this,
+// tenantIsolation always sees req.user === undefined and never actually
+// writes tenantId into the AsyncLocalStorage context tenantPlugin reads —
+// i.e. automatic per-tenant query scoping was silently not engaging for any
+// JWT-authenticated request. authenticateOptional never rejects a request
+// (unlike each route's own `authenticate`, which still runs afterwards and
+// still enforces "token required" exactly as before) — it only makes
+// req.user available earlier when a valid token is present, which is all
+// tenantIsolation needs.
+app.use(authenticateOptional);
 app.use(requestContext);
 app.use(tenantIsolation);
 
