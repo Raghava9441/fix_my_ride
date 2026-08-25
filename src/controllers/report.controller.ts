@@ -208,9 +208,10 @@ export class ReportController {
       endDate?: string;
     };
 
-    if (format && format !== "csv") {
+    const isExcel = format === "excel";
+    if (format && format !== "csv" && !isExcel) {
       const error = createErrorResponse(
-        `Not implemented — only "csv" export is wired up (no PDF/Excel generation library in this codebase yet)`,
+        `Not implemented — only "csv" and "excel" export are wired up (no PDF generation library in this codebase yet)`,
         HttpStatus.NOT_IMPLEMENTED,
       );
       return res.status(error.statusCode).json(error.toJSON());
@@ -269,6 +270,16 @@ export class ReportController {
         const error = createErrorResponse(`Unknown report type "${type}"`, HttpStatus.BAD_REQUEST);
         return res.status(error.statusCode).json(error.toJSON());
       }
+    }
+
+    if (isExcel) {
+      const buffer = await this.reportService.toExcel(rows);
+      res.setHeader(
+        "Content-Type",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      );
+      res.setHeader("Content-Disposition", `attachment; filename="${type}-report.xlsx"`);
+      return res.status(HttpStatus.OK).send(buffer);
     }
 
     const csv = this.reportService.toCsv(rows);

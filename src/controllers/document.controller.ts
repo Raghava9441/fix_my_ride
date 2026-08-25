@@ -199,6 +199,12 @@ export class DocumentController {
       return res.status(error.statusCode).json(error.toJSON());
     }
 
+    if (document.storageProvider !== "local") {
+      // Cloud-hosted (e.g. Cloudinary) — there's no local file to stream,
+      // send the caller to the provider's URL instead.
+      return res.redirect(document.url);
+    }
+
     const filePath = this.storageService.resolvePath(document.entityType, document.fileName);
     return res.download(filePath, document.originalName, (err) => {
       if (err && !res.headersSent) {

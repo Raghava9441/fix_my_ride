@@ -179,19 +179,17 @@ export class AdminController {
   }
 
   async getSystemLogs(req: Request, res: Response) {
-    const error = createErrorResponse(
-      "Not implemented — no queryable log store exists yet (winston logs to file/console only, see docs/logging.md)",
-      HttpStatus.NOT_IMPLEMENTED,
-    );
-    return res.status(error.statusCode).json(error.toJSON());
+    const level = req.query.level === "error" ? "error" : "combined";
+    const limit = parseInt(req.query.limit as string) || 200;
+    const logs = await this.adminService.getSystemLogs(level, limit);
+    const response = createSuccessResponse(logs, "System logs retrieved successfully");
+    return res.status(response.statusCode).json(response.toJSON());
   }
 
   async getSystemMetrics(req: Request, res: Response) {
-    const error = createErrorResponse(
-      "Not implemented — no request/latency metrics collector is wired up yet",
-      HttpStatus.NOT_IMPLEMENTED,
-    );
-    return res.status(error.statusCode).json(error.toJSON());
+    const metrics = this.adminService.getSystemMetrics();
+    const response = createSuccessResponse(metrics, "System metrics retrieved successfully");
+    return res.status(response.statusCode).json(response.toJSON());
   }
 
   async clearCache(req: Request, res: Response) {
@@ -211,11 +209,18 @@ export class AdminController {
   }
 
   async createBackup(req: Request, res: Response) {
-    const error = createErrorResponse(
-      "Not implemented — no backup mechanism (e.g. mongodump automation) exists in this codebase",
-      HttpStatus.NOT_IMPLEMENTED,
-    );
-    return res.status(error.statusCode).json(error.toJSON());
+    try {
+      const backup = await this.adminService.createBackup();
+      const response = createSuccessResponse(
+        backup,
+        "Backup created successfully",
+        HttpStatus.CREATED,
+      );
+      return res.status(response.statusCode).json(response.toJSON());
+    } catch (err: any) {
+      const error = createErrorResponse(err.message, HttpStatus.INTERNAL_SERVER_ERROR);
+      return res.status(error.statusCode).json(error.toJSON());
+    }
   }
 
   async getAuditLogs(req: Request, res: Response) {

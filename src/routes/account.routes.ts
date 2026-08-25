@@ -6,6 +6,8 @@ import {
   validateParams,
   ValidatedRequest,
 } from "../middleware/validation.middleware";
+import { authenticate } from "../middleware/auth.middleware";
+import { requireRole } from "../middleware/authorization.middleware";
 import {
   CreateAccountSchema,
   UpdateAccountSchema,
@@ -18,6 +20,8 @@ import { AccountController } from "../controllers/account.controller";
 import { accountService } from "../services/account.service";
 
 const router = Router();
+
+router.use(authenticate);
 
 const accountController = new AccountController(accountService);
 
@@ -73,6 +77,7 @@ router.patch(
 
 router.post(
   "/:id/roles",
+  requireRole("admin"),
   validateParams(IdParamSchema),
   validate(AssignRoleSchema),
   asyncHandler(async (req: ValidatedRequest<any>, res: Response) => {
@@ -82,6 +87,7 @@ router.post(
 
 router.delete(
   "/:id/roles/:roleId",
+  requireRole("admin"),
   validateParams(
     z.object({
       id: IdParamSchema.shape.id,

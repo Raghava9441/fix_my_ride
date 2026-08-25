@@ -3,6 +3,7 @@ import mongoose, { Schema, Document, Model, Types } from 'mongoose';
 import { tenantPlugin } from '../middleware/tenant/tenantPlugin';
 
 export interface INotification extends Document {
+    tenantId?: Types.ObjectId;
     recipientId: Types.ObjectId;
     recipientModel: 'Account' | 'ServiceCenter';
     title: string;

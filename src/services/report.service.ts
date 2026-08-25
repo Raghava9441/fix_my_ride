@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import ExcelJS from "exceljs";
 import { Vehicle } from "../models/Vehicle";
 import { ServiceRecord } from "../models/ServiceRecord";
 import { StaffProfile } from "../models/StaffProfile";
@@ -273,6 +274,20 @@ export class ReportService {
       lines.push(headers.map((h) => escape((row as any)[h])).join(","));
     }
     return lines.join("\n");
+  }
+
+  async toExcel(rows: Record<string, unknown>[]): Promise<Buffer> {
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet("Report");
+
+    if (rows.length > 0) {
+      const headers = Object.keys(rows[0]);
+      sheet.columns = headers.map((h) => ({ header: h, key: h, width: 20 }));
+      sheet.addRows(rows);
+      sheet.getRow(1).font = { bold: true };
+    }
+
+    return Buffer.from(await workbook.xlsx.writeBuffer());
   }
 }
 

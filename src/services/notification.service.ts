@@ -2,6 +2,9 @@ import { Notification } from "../models/Notification";
 import mongoose from "mongoose";
 
 export interface CreateNotificationInput {
+  /** Only needed when creating outside request context (e.g. background jobs) —
+   * the tenantPlugin auto-stamps this from AsyncLocalStorage otherwise. */
+  tenantId?: string;
   recipientId: string;
   recipientModel: "Account" | "ServiceCenter";
   title: string;
@@ -104,6 +107,7 @@ export class NotificationService {
 
   async create(input: CreateNotificationInput): Promise<any> {
     const notification = await Notification.create({
+      tenantId: input.tenantId ? new mongoose.Types.ObjectId(input.tenantId) : undefined,
       recipientId: new mongoose.Types.ObjectId(input.recipientId),
       recipientModel: input.recipientModel,
       title: input.title,

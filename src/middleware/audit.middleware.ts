@@ -2,6 +2,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { getRequestContext } from './requestContext.middleware';
 import { logger } from '../config/logger';
+import { auditLogService } from '../services/audit.service';
 
 // Sensitive fields to mask in audit logs
 const SENSITIVE_FIELDS = [
@@ -46,8 +47,26 @@ const getActionType = (method: string): string => {
   return actionMap[method] || 'UNKNOWN';
 };
 
+// Determine entity type from URL. Checked before the generic pattern map
+// below because this middleware is only actually mounted on /api/v1/admin,
+// /api/v1/auth/change-password and /api/v1/accounts/*/status (see app.ts) —
+// the generic map's keys ('vehicles', 'reminders', etc.) never match those
+// prefixes and would otherwise always fall through to the fallback.
+const SPECIFIC_PATTERNS: Array<[string, string]> = [
+  ['/admin/tenants', 'Tenant'],
+  ['/admin/users', 'Account'],
+  ['/change-password', 'Account'],
+  ['/accounts/', 'Account'],
+];
+
 // Determine entity type from URL
 const getEntityType = (url: string): string => {
+  for (const [pattern, entity] of SPECIFIC_PATTERNS) {
+    if (url.includes(pattern)) {
+      return entity;
+    }
+  }
+
   const patterns: Record<string, string> = {
     'vehicles': 'Vehicle',
     'owners': 'Owner',
@@ -65,15 +84,26 @@ const getEntityType = (url: string): string => {
     'documents': 'Document',
     'reviews': 'Review'
   };
-  
+
   for (const [pattern, entity] of Object.entries(patterns)) {
     if (url.includes(pattern)) {
       return entity;
     }
   }
-  
-  return 'Unknown';
+
+  return 'System';
 };
+
+// Map to the AuditLog model's persisted entityType enum — the generic map
+// above produces labels (e.g. 'User', 'Owner') that don't match the model's
+// enum, so anything not in this allowlist is coerced to 'System' rather than
+// failing the Mongoose validator.
+const PERSISTABLE_ENTITY_TYPES = new Set([
+  'Vehicle', 'ServiceRecord', 'Account', 'OwnerProfile', 'StaffProfile',
+  'ServiceCenter', 'Tenant', 'System',
+]);
+const toPersistableEntityType = (entityType: string): string =>
+  PERSISTABLE_ENTITY_TYPES.has(entityType) ? entityType : 'System';
 
 // Audit log middleware
 export const auditLogger = (req: Request, res: Response, next: NextFunction): void => {
@@ -138,7 +168,32 @@ export const auditLogger = (req: Request, res: Response, next: NextFunction): vo
       type: 'audit',
       ...auditEntry
     });
-    
+
+    // Persist to the AuditLog collection so /api/v1/audit-logs has something
+    // to read back. entityId is a required field on the model; for create
+    // requests where the new id isn't in req.params (e.g. POST /admin/tenants)
+    // there's nothing valid to persist, so those stay winston-only above.
+    const resolvedEntityId =
+      req.params.id ||
+      (req.originalUrl.includes('/change-password') ? userId : undefined);
+    if ((req as any).user?.id && resolvedEntityId) {
+      void auditLogService
+        .create({
+          tenantId,
+          actorId: (req as any).user.id,
+          actorRole: (req as any).user.role,
+          actorEmail: (req as any).user.email,
+          action: auditEntry.action as any,
+          entityType: toPersistableEntityType(auditEntry.entityType) as any,
+          entityId: resolvedEntityId,
+          ipAddress: req.ip,
+          userAgent: req.get('user-agent'),
+        })
+        .catch((err) =>
+          logger.error({ type: 'audit_persist_failed', error: (err as Error).message }),
+        );
+    }
+
     // For critical actions, also log to separate audit file
     const criticalActions = ['DELETE', 'UPDATE roles', 'UPDATE permissions', 'UPDATE subscription'];
     if (criticalActions.some(action => auditEntry.action === action || req.path.includes(action.toLowerCase()))) {

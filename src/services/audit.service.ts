@@ -21,7 +21,9 @@ export interface CreateAuditLogInput {
     | "Account"
     | "OwnerProfile"
     | "StaffProfile"
-    | "ServiceCenter";
+    | "ServiceCenter"
+    | "Tenant"
+    | "System";
   entityId: string;
   changes?: Array<{
     field: string;

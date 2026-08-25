@@ -8,7 +8,7 @@ export interface IAuditLog extends Document {
   actorRole?: 'owner' | 'staff' | 'admin' | 'system';
   actorEmail?: string;
   action: 'CREATE' | 'READ' | 'UPDATE' | 'DELETE' | 'LOGIN' | 'LOGOUT' | 'GRANT_ACCESS' | 'REVOKE_ACCESS';
-  entityType: 'Vehicle' | 'ServiceRecord' | 'Account' | 'OwnerProfile' | 'StaffProfile' | 'ServiceCenter';
+  entityType: 'Vehicle' | 'ServiceRecord' | 'Account' | 'OwnerProfile' | 'StaffProfile' | 'ServiceCenter' | 'Tenant' | 'System';
   entityId: Types.ObjectId;
   changes: Types.DocumentArray<{
     field?: string;
@@ -48,7 +48,7 @@ const auditLogSchema = new Schema<IAuditLog, IAuditLogModel>({
   entityType: {
     type: String,
     required: true,
-    enum: ['Vehicle', 'ServiceRecord', 'Account', 'OwnerProfile', 'StaffProfile', 'ServiceCenter']
+    enum: ['Vehicle', 'ServiceRecord', 'Account', 'OwnerProfile', 'StaffProfile', 'ServiceCenter', 'Tenant', 'System']
   },
   entityId: { type: Schema.Types.ObjectId, required: true },
 
