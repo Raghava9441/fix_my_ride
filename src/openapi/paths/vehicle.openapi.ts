@@ -9,6 +9,12 @@ import {
   UpdateOdometerSchema,
   TransferOwnershipSchema,
 } from "../../dto/vehicle.dto";
+import {
+  CreateOdometerReadingSchema,
+  UpdateOdometerReadingSchema,
+  VerifyOdometerSchema,
+  QueryOdometerHistorySchema,
+} from "../../dto/odometer-reading.dto";
 
 const TAGS = ["Vehicles"];
 const record = z.record(z.any());
@@ -100,6 +106,42 @@ registry.registerPath({
 registry.registerPath({
   method: "get", path: `${base}/{id}/odometer/history`, tags: TAGS, summary: "Get a vehicle's odometer history", security: BEARER_AUTH, request: { params: IdParamSchema },
   responses: { 200: { description: "Odometer history", content: { "application/json": { schema: successEnvelope("VehicleOdometerHistoryResponse", z.array(record)) } } }, ...commonErrorResponses({ notFound: true }) },
+});
+
+// Dedicated OdometerReading resource — addressable individual readings
+// (verify/correct/delete), on top of the current-value endpoints above.
+registry.registerPath({
+  method: "get", path: `${base}/{id}/odometer-readings`, tags: TAGS, summary: "List a vehicle's odometer reading history (paginated, filterable)", security: BEARER_AUTH,
+  request: { params: IdParamSchema, query: QueryOdometerHistorySchema },
+  responses: { 200: { description: "Odometer readings", content: { "application/json": { schema: successEnvelope("OdometerReadingListResponse", z.array(record)) } } }, ...commonErrorResponses({ notFound: true }) },
+});
+
+registry.registerPath({
+  method: "post", path: `${base}/{id}/odometer-readings`, tags: TAGS, summary: "Record a new odometer reading (as an addressable history entry)", security: BEARER_AUTH,
+  request: { params: IdParamSchema, ...jsonBody(CreateOdometerReadingSchema.omit({ vehicleId: true })) },
+  responses: { 201: { description: "Odometer reading recorded", content: { "application/json": { schema: successEnvelope("OdometerReadingResponse", record) } } }, 400: { description: "New reading is lower than the vehicle's current reading" }, ...commonErrorResponses({ notFound: true, validate: true }) },
+});
+
+registry.registerPath({
+  method: "get", path: `${base}/{id}/odometer-readings/{readingId}`, tags: TAGS, summary: "Get a single odometer reading", security: BEARER_AUTH, request: { params: withId({ readingId: z.string() }) },
+  responses: { 200: { description: "Odometer reading", content: { "application/json": { schema: successEnvelope("OdometerReadingResponse", record) } } }, ...commonErrorResponses({ notFound: true }) },
+});
+
+registry.registerPath({
+  method: "patch", path: `${base}/{id}/odometer-readings/{readingId}`, tags: TAGS, summary: "Correct a historical odometer reading's own fields (does not touch the vehicle's current reading)", security: BEARER_AUTH,
+  request: { params: withId({ readingId: z.string() }), ...jsonBody(UpdateOdometerReadingSchema) },
+  responses: { 200: { description: "Odometer reading updated", content: { "application/json": { schema: successEnvelope("OdometerReadingResponse", record) } } }, ...commonErrorResponses({ notFound: true, validate: true }) },
+});
+
+registry.registerPath({
+  method: "patch", path: `${base}/{id}/odometer-readings/{readingId}/verify`, tags: TAGS, summary: "Mark an odometer reading as verified", security: BEARER_AUTH,
+  request: { params: withId({ readingId: z.string() }), ...jsonBody(VerifyOdometerSchema) },
+  responses: { 200: { description: "Odometer reading verified", content: { "application/json": { schema: successEnvelope("OdometerReadingResponse", record) } } }, ...commonErrorResponses({ notFound: true, validate: true }) },
+});
+
+registry.registerPath({
+  method: "delete", path: `${base}/{id}/odometer-readings/{readingId}`, tags: TAGS, summary: "Soft-delete a bad odometer reading entry", security: BEARER_AUTH, request: { params: withId({ readingId: z.string() }) },
+  responses: { 200: { description: "Odometer reading deleted", content: { "application/json": { schema: successEnvelope("OdometerReadingDeletedResponse", z.object({ id: z.string(), deleted: z.boolean() })) } } }, ...commonErrorResponses({ notFound: true }) },
 });
 
 registry.registerPath({

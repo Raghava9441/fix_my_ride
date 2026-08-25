@@ -19,3 +19,8 @@ import "./document.openapi";
 import "./audit.openapi";
 import "./report.openapi";
 import "./public.openapi";
+import "./tenant.openapi";
+import "./subscriptionPlan.openapi";
+import "./subscription.openapi";
+import "./payment.openapi";
+import "./invoice.openapi";
