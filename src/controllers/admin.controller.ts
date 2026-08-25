@@ -197,7 +197,10 @@ export class AdminController {
   }
 
   async clearCache(req: Request, res: Response) {
-    const pattern = (req.body?.pattern as string) || "*";
+    // Default scoped to what cache.middleware.ts actually writes — "*"
+    // would also wipe the token-revocation denylist and job queue state,
+    // which share this same Redis instance/DB.
+    const pattern = (req.body?.pattern as string) || "cache:*";
     await cacheDelPattern(pattern);
 
     const response = createSuccessResponse({ pattern }, "Cache cleared successfully");
