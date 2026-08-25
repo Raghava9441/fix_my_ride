@@ -33,6 +33,8 @@ export interface ISubscription extends Document {
   autoRenew: boolean;
   paymentIds: Types.ObjectId[];
 
+  lastRenewalReminderAt?: Date;
+
   isDeleted: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -82,6 +84,8 @@ const subscriptionSchema = new Schema<ISubscription, ISubscriptionModel>(
     quantity: { type: Number, default: 1, min: 1 },
     autoRenew: { type: Boolean, default: true },
     paymentIds: [{ type: Schema.Types.ObjectId, ref: "Payment" }],
+
+    lastRenewalReminderAt: Date,
 
     isDeleted: { type: Boolean, default: false, index: true },
   },

@@ -14,6 +14,8 @@ declare global {
       userModel?: string;
       startTime: number;
       context: Map<string, any>;
+      /** Raw request bytes, captured by express.json()'s verify callback in app.ts — needed for webhook HMAC signature verification. */
+      rawBody?: Buffer;
     }
   }
 }

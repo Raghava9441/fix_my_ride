@@ -1,6 +1,7 @@
 // models/Invoice.ts
 import mongoose, { Schema, Document, Model, Types } from "mongoose";
 import { tenantPlugin } from "../middleware/tenant/tenantPlugin";
+import { Counter } from "./Counter";
 
 export interface IInvoice extends Document {
   tenantId?: Types.ObjectId;
@@ -209,17 +210,12 @@ invoiceSchema.statics.findOverdue = function (this: IInvoiceModel) {
   }).sort({ dueDate: 1 });
 };
 
-// Not concurrency-safe (read-then-write on a shared counter) — fine for the
-// current single-writer seed/admin flows; move to an atomic counter document
-// if invoices start being created from concurrent request handlers.
 invoiceSchema.statics.generateInvoiceNumber = async function (
   this: IInvoiceModel,
 ): Promise<string> {
   const year = new Date().getFullYear();
-  const start = new Date(`${year}-01-01T00:00:00.000Z`);
-  const end = new Date(`${year + 1}-01-01T00:00:00.000Z`);
-  const count = await this.countDocuments({ issueDate: { $gte: start, $lt: end } });
-  return `INV-${year}-${String(count + 1).padStart(5, "0")}`;
+  const seq = await Counter.next(`invoice:${year}`);
+  return `INV-${year}-${String(seq).padStart(5, "0")}`;
 };
 
 invoiceSchema.plugin(tenantPlugin);

@@ -38,6 +38,10 @@ import permissionRoutes from "./routes/permission.routes";
 import roleRoutes from "./routes/role.routes";
 import reportRoutes from "./routes/report.routes";
 import subscriptionPlanRoutes from "./routes/subscriptionPlan.routes";
+import subscriptionRoutes from "./routes/subscription.routes";
+import paymentRoutes from "./routes/payment.routes";
+import invoiceRoutes from "./routes/invoice.routes";
+import webhookRoutes from "./routes/webhook.routes";
 import publicRoutes from "./routes/public.routes";
 import accountRoutes from "./routes/account.routes";
 import healthRoutes from "./routes/health.routes";
@@ -114,8 +118,18 @@ app.use(cors(corsOptions));
 // Rate limiting
 app.use("/api", expressRateLimit(rateLimitConfig));
 
-// Body parsing middleware
-app.use(express.json({ limit: "10mb" }));
+// Body parsing middleware. The `verify` callback stashes the raw request
+// bytes on req.rawBody before JSON-parsing — needed by the Razorpay webhook
+// route (webhook.routes.ts) to verify the HMAC signature, which is computed
+// over the exact bytes Razorpay sent, not the re-serialized parsed object.
+app.use(
+  express.json({
+    limit: "10mb",
+    verify: (req: Request, _res: Response, buf: Buffer) => {
+      req.rawBody = buf;
+    },
+  }),
+);
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 app.use(cookieParser());
 
@@ -197,6 +211,10 @@ app.use("/api/v1/permissions", permissionRoutes);
 app.use("/api/v1/roles", roleRoutes);
 app.use("/api/v1/reports", reportRoutes);
 app.use("/api/v1/subscription-plans", subscriptionPlanRoutes);
+app.use("/api/v1/subscriptions", subscriptionRoutes);
+app.use("/api/v1/payments", paymentRoutes);
+app.use("/api/v1/invoices", invoiceRoutes);
+app.use("/api/v1/webhooks", webhookRoutes);
 app.use("/api/v1/admin", adminRoutes);
 app.use("/api/v1/tenants", tenantRoutes);
 app.use("/api/v1/public", publicRoutes);

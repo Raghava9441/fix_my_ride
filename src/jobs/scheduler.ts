@@ -1,6 +1,7 @@
 // src/jobs/scheduler.ts
 import cron, { ScheduledTask } from "node-cron";
 import { checkReminders } from "./reminder.job";
+import { checkExpiringSubscriptions } from "./subscription.job";
 import { logger } from "../config/logger";
 
 let tasks: ScheduledTask[] = [];
@@ -17,8 +18,19 @@ export function startScheduledJobs(): void {
     );
   });
 
-  tasks = [reminderTask];
-  logger.info({ type: "scheduled_jobs_bootstrapped", jobs: ["reminder_check (*/15 * * * *)"] });
+  // Once daily is enough for renewal reminders (vs. every 15 min for
+  // time-sensitive vehicle reminders above).
+  const subscriptionTask = cron.schedule("0 6 * * *", () => {
+    void checkExpiringSubscriptions().catch((err) =>
+      logger.error({ type: "subscription_expiry_job_failed", error: (err as Error).message }),
+    );
+  });
+
+  tasks = [reminderTask, subscriptionTask];
+  logger.info({
+    type: "scheduled_jobs_bootstrapped",
+    jobs: ["reminder_check (*/15 * * * *)", "subscription_expiry_check (0 6 * * *)"],
+  });
 }
 
 export function stopScheduledJobs(): void {
