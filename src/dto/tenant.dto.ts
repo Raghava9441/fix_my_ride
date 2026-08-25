@@ -115,7 +115,42 @@ export const UpdateTenantStatusSchema = z.object({
   status: z.enum(["active", "inactive", "suspended", "cancelled"]),
 });
 
+// A tenant owner managing their own organization gets a deliberately
+// narrower surface than platform-admin's UpdateTenantSchema above — no
+// slug/limits/subscription/isActive/billing, all of which stay
+// platform-admin-only via /api/v1/admin/tenants/:id.
+export const UpdateMyTenantSchema = z
+  .object({
+    name: z.string().min(1).max(100).optional(),
+    description: z.string().optional(),
+    logoUrl: z.string().url().optional(),
+    website: z.string().url().optional(),
+    contactEmail: z.string().email().optional(),
+    contactPhone: z.string().optional(),
+    address: z
+      .object({
+        street: z.string().optional(),
+        city: z.string().optional(),
+        state: z.string().optional(),
+        country: z.string().optional(),
+        postalCode: z.string().optional(),
+        timezone: z.string().optional(),
+        currency: z.enum(["USD", "eur", "gbp", "inr", "aed"]).optional(),
+      })
+      .optional(),
+    settings: z
+      .object({
+        enableMfa: z.boolean().optional(),
+        requireEmailVerification: z.boolean().optional(),
+        allowSignups: z.boolean().optional(),
+        sessionTimeoutMinutes: z.number().optional(),
+      })
+      .optional(),
+  })
+  .partial();
+
 // Types
 export type CreateTenantDTO = z.infer<typeof CreateTenantSchema>;
 export type UpdateTenantDTO = z.infer<typeof UpdateTenantSchema>;
 export type UpdateTenantStatusDTO = z.infer<typeof UpdateTenantStatusSchema>;
+export type UpdateMyTenantDTO = z.infer<typeof UpdateMyTenantSchema>;

@@ -2,6 +2,13 @@ import { Router, Request, Response } from "express";
 import { asyncHandler } from "../utils";
 import { authenticate } from "../middleware/auth.middleware";
 import { requireRole } from "../middleware/authorization.middleware";
+import { validate, validateParams } from "../middleware/validation.middleware";
+import { IdParamSchema } from "../dto/common.dto";
+import {
+  CreateTenantSchema,
+  UpdateTenantSchema,
+  UpdateTenantStatusSchema,
+} from "../dto/tenant.dto";
 import { AdminController } from "../controllers/admin.controller";
 import { adminService } from "../services/admin.service";
 import { tenantService } from "../services/tenant.service";
@@ -40,30 +47,37 @@ router.get(
 );
 router.post(
   "/tenants",
+  validate(CreateTenantSchema),
   asyncHandler(async (req: Request, res: Response) => {
     await adminController.createTenant(req, res);
   }),
 );
 router.get(
   "/tenants/:id",
+  validateParams(IdParamSchema),
   asyncHandler(async (req: Request, res: Response) => {
     await adminController.getTenantById(req, res);
   }),
 );
 router.put(
   "/tenants/:id",
+  validateParams(IdParamSchema),
+  validate(UpdateTenantSchema),
   asyncHandler(async (req: Request, res: Response) => {
     await adminController.updateTenant(req, res);
   }),
 );
 router.delete(
   "/tenants/:id",
+  validateParams(IdParamSchema),
   asyncHandler(async (req: Request, res: Response) => {
     await adminController.deleteTenant(req, res);
   }),
 );
 router.patch(
   "/tenants/:id/status",
+  validateParams(IdParamSchema),
+  validate(UpdateTenantStatusSchema),
   asyncHandler(async (req: Request, res: Response) => {
     await adminController.updateTenantStatus(req, res);
   }),

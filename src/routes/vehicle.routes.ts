@@ -3,6 +3,7 @@ import { z } from "zod";
 import { asyncHandler } from "../utils";
 import {
   validate,
+  validateQuery,
   validateParams,
   ValidatedRequest,
 } from "../middleware/validation.middleware";
@@ -15,11 +16,19 @@ import {
   UpdateOdometerSchema,
   TransferOwnershipSchema,
 } from "../dto/vehicle.dto";
+import {
+  CreateOdometerReadingSchema,
+  UpdateOdometerReadingSchema,
+  VerifyOdometerSchema,
+  QueryOdometerHistorySchema,
+} from "../dto/odometer-reading.dto";
 import { IdParamSchema } from "../dto/account.dto";
 import { VehicleController } from "../controllers/vehicle.controller";
+import { OdometerReadingController } from "../controllers/odometerReading.controller";
 import { vehicleService } from "../services/vehicle.service";
 import { documentService } from "../services/document.service";
 import { reminderService } from "../services/reminder.service";
+import { odometerReadingService } from "../services/odometerReading.service";
 
 const router = Router();
 
@@ -29,6 +38,8 @@ const vehicleController = new VehicleController(
   reminderService,
 );
 
+const odometerReadingController = new OdometerReadingController(odometerReadingService);
+
 const CenterParamSchema = z.object({
   id: IdParamSchema.shape.id,
   centerId: IdParamSchema.shape.id,
@@ -37,6 +48,15 @@ const CenterParamSchema = z.object({
 const DocumentParamSchema = z.object({
   id: IdParamSchema.shape.id,
   documentId: IdParamSchema.shape.id,
+});
+
+const OdometerReadingParamSchema = z.object({
+  id: IdParamSchema.shape.id,
+  readingId: IdParamSchema.shape.id,
+});
+
+const CreateNestedOdometerReadingSchema = CreateOdometerReadingSchema.omit({
+  vehicleId: true,
 });
 
 router.use(authenticate);
@@ -166,6 +186,60 @@ router.get(
   validateParams(IdParamSchema),
   asyncHandler(async (req: ValidatedRequest<any>, res: Response) => {
     await vehicleController.getOdometerHistory(req, res);
+  }),
+);
+
+// Dedicated OdometerReading resource — addressable individual readings
+// (verify/correct/delete), on top of the current-value endpoints above.
+router.get(
+  "/:id/odometer-readings",
+  validateParams(IdParamSchema),
+  validateQuery(QueryOdometerHistorySchema),
+  asyncHandler(async (req: ValidatedRequest<any>, res: Response) => {
+    await odometerReadingController.getHistory(req, res);
+  }),
+);
+
+router.post(
+  "/:id/odometer-readings",
+  validateParams(IdParamSchema),
+  validate(CreateNestedOdometerReadingSchema),
+  asyncHandler(async (req: ValidatedRequest<any>, res: Response) => {
+    await odometerReadingController.create(req, res);
+  }),
+);
+
+router.get(
+  "/:id/odometer-readings/:readingId",
+  validateParams(OdometerReadingParamSchema),
+  asyncHandler(async (req: ValidatedRequest<any>, res: Response) => {
+    await odometerReadingController.getById(req, res);
+  }),
+);
+
+router.patch(
+  "/:id/odometer-readings/:readingId",
+  validateParams(OdometerReadingParamSchema),
+  validate(UpdateOdometerReadingSchema),
+  asyncHandler(async (req: ValidatedRequest<any>, res: Response) => {
+    await odometerReadingController.update(req, res);
+  }),
+);
+
+router.patch(
+  "/:id/odometer-readings/:readingId/verify",
+  validateParams(OdometerReadingParamSchema),
+  validate(VerifyOdometerSchema),
+  asyncHandler(async (req: ValidatedRequest<any>, res: Response) => {
+    await odometerReadingController.verify(req, res);
+  }),
+);
+
+router.delete(
+  "/:id/odometer-readings/:readingId",
+  validateParams(OdometerReadingParamSchema),
+  asyncHandler(async (req: ValidatedRequest<any>, res: Response) => {
+    await odometerReadingController.delete(req, res);
   }),
 );
 

@@ -97,15 +97,10 @@ export const config = {
     prettyPrint: env.LOG_PRETTY,
   },
 
-  stripe: {
-    secretKey: env.STRIPE_SECRET_KEY,
-    webhookSecret: env.STRIPE_WEBHOOK_SECRET,
-  },
-
-  paypal: {
-    clientId: env.PAYPAL_CLIENT_ID,
-    clientSecret: env.PAYPAL_CLIENT_SECRET,
-    environment: env.PAYPAL_ENVIRONMENT,
+  razorpay: {
+    keyId: env.RAZORPAY_KEY_ID,
+    keySecret: env.RAZORPAY_KEY_SECRET,
+    webhookSecret: env.RAZORPAY_WEBHOOK_SECRET,
   },
 
   google: {

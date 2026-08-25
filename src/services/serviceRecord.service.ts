@@ -3,6 +3,7 @@ import { Vehicle } from "../models/Vehicle";
 import { OwnerProfile } from "../models/OwnerProfile";
 import { ServiceCenter } from "../models/ServiceCenter";
 import { StaffProfile } from "../models/StaffProfile";
+import { odometerReadingService } from "./odometerReading.service";
 import mongoose from "mongoose";
 
 export interface CreateServiceRecordInput {
@@ -267,12 +268,16 @@ export class ServiceRecordService {
         nextServiceDueDate: input.nextService.recommendedDate,
         nextServiceDueOdometer: input.nextService.recommendedOdometer,
       };
-      vehicle.currentOdometer = {
+      await vehicle.save();
+
+      await odometerReadingService.record({
+        tenantId: input.tenantId,
+        vehicleId: input.vehicleId,
         value: input.odometerReading.value,
         unit: input.odometerReading.unit || "km",
-        recordedAt: new Date(),
-      };
-      await vehicle.save();
+        recordedAt: input.serviceDate || new Date(),
+        source: "service_record",
+      });
     }
 
     return record;
@@ -351,11 +356,6 @@ export class ServiceRecordService {
     if (status === "completed") {
       const vehicle = await Vehicle.findById(record.vehicleId);
       if (vehicle) {
-        vehicle.currentOdometer = {
-          value: record.odometerReading.value,
-          unit: record.odometerReading.unit || "km",
-          recordedAt: record.serviceDate,
-        };
         if (record.nextService) {
           vehicle.serviceSchedule = {
             lastServiceDate: record.serviceDate,
@@ -363,8 +363,17 @@ export class ServiceRecordService {
             nextServiceDueDate: record.nextService.recommendedDate,
             nextServiceDueOdometer: record.nextService.recommendedOdometer,
           };
+          await vehicle.save();
         }
-        await vehicle.save();
+
+        await odometerReadingService.record({
+          tenantId: record.tenantId ? String(record.tenantId) : undefined,
+          vehicleId: String(vehicle._id),
+          value: record.odometerReading.value,
+          unit: record.odometerReading.unit || "km",
+          recordedAt: record.serviceDate,
+          source: "service_record",
+        });
       }
 
       if (record.technicianId) {

@@ -40,7 +40,7 @@ export const VerifyOdometerSchema = z.object({
 });
 
 export const QueryOdometerHistorySchema = z.object({
-  limit: z.number().min(1).max(100).default(100),
+  limit: z.coerce.number().min(1).max(100).default(100),
   from: z.string().datetime().optional(),
   to: z.string().datetime().optional(),
 });

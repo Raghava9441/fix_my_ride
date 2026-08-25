@@ -2,7 +2,7 @@ import { Vehicle } from "../models/Vehicle";
 import { OwnerProfile } from "../models/OwnerProfile";
 import { ServiceCenter } from "../models/ServiceCenter";
 import { ServiceRecord } from "../models/ServiceRecord";
-import { OdometerReading } from "../models/OdometerReading";
+import { odometerReadingService } from "./odometerReading.service";
 import mongoose from "mongoose";
 
 export interface CreateVehicleInput {
@@ -389,6 +389,7 @@ export class VehicleService {
     };
   }
 
+  /** Thin wrapper kept for the existing /:id/odometer route — see odometerReading.service.ts. */
   async updateOdometer(
     vehicleId: string,
     value: number,
@@ -400,50 +401,21 @@ export class VehicleService {
       | "import"
       | "api" = "manual_entry",
   ): Promise<any> {
-    const vehicle = await Vehicle.findById(vehicleId);
-    if (!vehicle) {
-      throw new Error("Vehicle not found");
-    }
-
-    if (value < vehicle.currentOdometer.value) {
-      throw new Error(
-        "New odometer reading cannot be less than current reading",
-      );
-    }
-
-    const oldValue = vehicle.currentOdometer.value;
-    vehicle.currentOdometer = {
+    await odometerReadingService.record({
+      vehicleId,
       value,
       unit,
-      recordedAt: new Date(),
-      recordedBy: recordedBy
-        ? new mongoose.Types.ObjectId(recordedBy)
-        : undefined,
-    };
-
-    await vehicle.save();
-
-    await OdometerReading.create({
-      vehicleId: vehicle._id,
-      value,
-      unit,
-      recordedAt: new Date(),
-      recordedBy: recordedBy
-        ? new mongoose.Types.ObjectId(recordedBy)
-        : undefined,
-      recordedByModel: recordedBy ? "Account" : undefined,
+      recordedBy,
       source,
-      isVerified: false,
     });
-
-    return vehicle;
+    return Vehicle.findById(vehicleId);
   }
 
   async getOdometerHistory(
     vehicleId: string,
     options?: { limit?: number; from?: Date; to?: Date },
   ): Promise<any[]> {
-    return OdometerReading.getHistory(vehicleId, options);
+    return odometerReadingService.getHistory(vehicleId, options);
   }
 
   async transferOwnership(

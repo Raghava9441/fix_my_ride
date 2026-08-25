@@ -29,6 +29,7 @@ import ownerRoutes from "./routes/owner.routes";
 import centerRoutes from "./routes/serviceCenter.routes";
 import staffRoutes from "./routes/staff.routes";
 import adminRoutes from "./routes/admin.routes";
+import tenantRoutes from "./routes/tenant.routes";
 import vehicleRoutes from "./routes/vehicle.routes";
 import serviceRecordRoutes from "./routes/serviceRecord.routes";
 import reminderRoutes from "./routes/reminder.routes";
@@ -84,14 +85,20 @@ app.use(
       directives: {
         defaultSrc: ["'self'"],
         styleSrc: ["'self'", "'unsafe-inline'"],
-        scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
+        scriptSrc: [
+          "'self'",
+          "'unsafe-inline'",
+          "'unsafe-eval'",
+          "https://checkout.razorpay.com",
+        ],
         imgSrc: ["'self'", "data:", "https:"],
         connectSrc: [
           "'self'",
-          "https://api.stripe.com",
+          "https://api.razorpay.com",
+          "https://lumberjack.razorpay.com",
           "https://maps.googleapis.com",
         ],
-        frameSrc: ["'self'", "https://js.stripe.com"],
+        frameSrc: ["'self'", "https://api.razorpay.com"],
         workerSrc: ["'self'", "blob:"],
         childSrc: ["'self'", "blob:"],
       },
@@ -153,7 +160,7 @@ app.use(healthRoutes);
 // Interactive API docs (Scalar UI + raw OpenAPI JSON), public/unauthenticated.
 // Scalar's Express middleware renders a page that loads its viewer bundle
 // from jsdelivr at runtime, which the app-wide CSP above blocks — same as
-// Stripe/Google Maps above, this overrides the CSP for just this route
+// Razorpay/Google Maps above, this overrides the CSP for just this route
 // rather than loosening it globally.
 app.use(
   "/api-docs",
@@ -189,6 +196,7 @@ app.use("/api/v1/permissions", permissionRoutes);
 app.use("/api/v1/roles", roleRoutes);
 app.use("/api/v1/reports", reportRoutes);
 app.use("/api/v1/admin", adminRoutes);
+app.use("/api/v1/tenants", tenantRoutes);
 app.use("/api/v1/public", publicRoutes);
 app.use("/api/v1/accounts", accountRoutes);
 app.use("/api/v1/notifications", notificationRoutes);

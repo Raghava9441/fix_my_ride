@@ -97,12 +97,10 @@ export const envSchema = z
     CLOUDINARY_API_KEY: z.string().optional(),
     CLOUDINARY_API_SECRET: z.string().optional(),
 
-    // ─── Payments ───────────────────────────────────────────────────────
-    STRIPE_SECRET_KEY: z.string().optional(),
-    STRIPE_WEBHOOK_SECRET: z.string().optional(),
-    PAYPAL_CLIENT_ID: z.string().optional(),
-    PAYPAL_CLIENT_SECRET: z.string().optional(),
-    PAYPAL_ENVIRONMENT: z.enum(["sandbox", "live"]).default("sandbox"),
+    // ─── Payments (Razorpay) ────────────────────────────────────────────
+    RAZORPAY_KEY_ID: z.string().optional(),
+    RAZORPAY_KEY_SECRET: z.string().optional(),
+    RAZORPAY_WEBHOOK_SECRET: z.string().optional(),
 
     // ─── OAuth providers ────────────────────────────────────────────────
     GOOGLE_CLIENT_ID: z.string().optional(),
@@ -161,6 +159,14 @@ export const envSchema = z
           code: z.ZodIssueCode.custom,
           path: ["SMTP_HOST"],
           message: "SMTP_HOST is required in production/staging",
+        });
+      }
+      if (!data.RAZORPAY_KEY_ID || !data.RAZORPAY_KEY_SECRET || !data.RAZORPAY_WEBHOOK_SECRET) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["RAZORPAY_KEY_ID"],
+          message:
+            "RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET and RAZORPAY_WEBHOOK_SECRET are all required in production/staging",
         });
       }
       if (data.LOG_PRETTY) {

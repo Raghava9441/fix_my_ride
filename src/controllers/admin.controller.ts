@@ -102,7 +102,11 @@ export class AdminController {
 
   async updateTenantStatus(req: Request, res: Response) {
     const { id } = req.params;
-    const { isActive } = req.body;
+    // UpdateTenantStatusSchema's `status` enum ("active"|"inactive"|"suspended"|"cancelled")
+    // collapses onto the model's single `isActive` boolean — Tenant has no
+    // separate status field, so only "active" maps to true.
+    const { status } = req.body as { status: string };
+    const isActive = status === "active";
     const tenant = await this.tenantService.update(id, { isActive } as any);
 
     if (!tenant) {
