@@ -56,6 +56,7 @@ Two things happen transparently via request-scoped context (`AsyncLocalStorage`)
 | [docs/typescript.md](docs/typescript.md) | tsconfig, the TS-version constraint, strict-mode fallout patterns |
 | [docs/mongoose.md](docs/mongoose.md) | **The statics/methods typing pattern every model must follow** — read before touching any model |
 | [docs/data-model.html](docs/data-model.html) | Visual reference: every collection, its fields, and how they relate — open directly in a browser (self-contained, loads Mermaid from a CDN for the ER diagram) |
+| `/api-docs` (running server) | Interactive OpenAPI 3.1 reference (Scalar UI) generated from `src/openapi/` — the spec is built directly from the same Zod DTOs in `src/dto/`, not hand-written, so it can't drift from what routes actually validate. Raw JSON at `/api-docs/openapi.json`. |
 | [docs/database.md](docs/database.md) | Connection lifecycle, transactions, pagination, soft-delete/audit plugins |
 | [docs/multi-tenancy.md](docs/multi-tenancy.md) | How tenant isolation is enforced — spans 3 files, not obvious from any one |
 | [docs/rbac.md](docs/rbac.md) | Permission/Role/StaffProfile/OwnerProfile chain, and which parts are actually enforced vs. built-but-unused |

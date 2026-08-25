@@ -17,7 +17,7 @@ import { ERROR_CODES } from "../constants/errors";
  *
  * Admin requests are intentionally NOT scoped (global visibility).
  */
-const PUBLIC_PREFIXES = ["/health", "/ready", "/live", "/api/v1/public", "/api/v1/webhooks"];
+const PUBLIC_PREFIXES = ["/health", "/ready", "/live", "/api/v1/public", "/api/v1/webhooks", "/api-docs"];
 
 export const tenantIsolation = (
   req: Request,

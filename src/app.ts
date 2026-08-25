@@ -42,6 +42,7 @@ import healthRoutes from "./routes/health.routes";
 import notificationRoutes from "./routes/notification.routes";
 import documentRoutes from "./routes/document.routes";
 import auditRoutes from "./routes/audit.routes";
+import docsRoutes from "./routes/docs.routes";
 
 // Import services
 // import { healthCheckService } from './services/health/healthCheckService';
@@ -148,6 +149,32 @@ app.use("/api/v1/accounts/*/status", auditLogger);
 
 // Health check endpoints (public probes, intentionally unscoped)
 app.use(healthRoutes);
+
+// Interactive API docs (Scalar UI + raw OpenAPI JSON), public/unauthenticated.
+// Scalar's Express middleware renders a page that loads its viewer bundle
+// from jsdelivr at runtime, which the app-wide CSP above blocks — same as
+// Stripe/Google Maps above, this overrides the CSP for just this route
+// rather than loosening it globally.
+app.use(
+  "/api-docs",
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://cdn.jsdelivr.net"],
+        styleSrc: ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net", "https://fonts.googleapis.com"],
+        fontSrc: ["'self'", "https://cdn.jsdelivr.net", "https://fonts.scalar.com", "data:"],
+        imgSrc: ["'self'", "data:", "https:"],
+        // Deliberately NOT allowing api.scalar.com — that's Scalar's own
+        // cloud registry/telemetry, unrelated to serving our own spec.
+        connectSrc: ["'self'", "https://cdn.jsdelivr.net"],
+        workerSrc: ["'self'", "blob:"],
+      },
+    },
+    crossOriginEmbedderPolicy: false,
+  }),
+  docsRoutes,
+);
 
 // API version 1 routes
 app.use("/api/v1/auth", authRoutes);
