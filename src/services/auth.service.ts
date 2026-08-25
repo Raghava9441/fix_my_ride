@@ -38,7 +38,7 @@ const REVOKED_PREFIX = "auth:revoked:";
  * Generate a short-lived access token + long-lived refresh token.
  * Both carry a `jti` so they can be individually revoked.
  */
-function issueTokens(account: any): TokenPair {
+export function issueTokens(account: any): TokenPair {
   const jtiAccess = crypto.randomBytes(16).toString("hex");
   const jtiRefresh = crypto.randomBytes(16).toString("hex");
 
@@ -197,6 +197,20 @@ export const authService = {
       throw AppError.fromCode("EMAIL_NOT_VERIFIED", {
         message: "Please verify your email before logging in",
       });
+    }
+
+    if (account.tenantId) {
+      const tenant = await Tenant.findById(account.tenantId).select("onboarding");
+      if (tenant?.onboarding?.status === "pending_review") {
+        throw AppError.fromCode("ORG_PENDING_APPROVAL");
+      }
+      if (tenant?.onboarding?.status === "rejected") {
+        throw AppError.fromCode("ORG_REJECTED", {
+          message: tenant.onboarding.rejectionReason
+            ? `Your organization's application was not approved: ${tenant.onboarding.rejectionReason}`
+            : undefined,
+        });
+      }
     }
 
     if (account.mfaEnabled) {

@@ -14,6 +14,7 @@ export * from "./notification.dto";
 export * from "./document.dto";
 export * from "./subscription-plan.dto";
 export * from "./subscription.dto";
+export * from "./onboarding.dto";
 export * from "./payment.dto";
 export * from "./invoice.dto";
 export * from "./odometer-reading.dto";

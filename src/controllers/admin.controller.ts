@@ -4,6 +4,7 @@ import { TenantService } from "../services/tenant.service";
 import { AccountService } from "../services/account.service";
 import { AuditLogService } from "../services/audit.service";
 import { cacheDelPattern } from "../config/redis";
+import { NotifyFn } from "../services/auth.service";
 import {
   HttpStatus,
   createSuccessResponse,
@@ -17,6 +18,7 @@ export class AdminController {
     private readonly tenantService: TenantService,
     private readonly accountService: AccountService,
     private readonly auditLogService: AuditLogService,
+    private readonly notify: NotifyFn,
   ) {}
 
   async getDashboard(req: Request, res: Response) {
@@ -118,6 +120,70 @@ export class AdminController {
       { id: tenant._id, isActive: tenant.isActive },
       "Tenant status updated successfully",
     );
+    return res.status(response.statusCode).json(response.toJSON());
+  }
+
+  async getPendingTenants(req: Request, res: Response) {
+    const filters = {
+      page: parseInt(req.query.page as string) || 1,
+      limit: parseInt(req.query.limit as string) || 20,
+    };
+    const result = await this.tenantService.findPendingReview(filters);
+
+    const response = createPaginatedResponse(
+      result.data,
+      result.pagination.page,
+      result.pagination.limit,
+      result.pagination.total,
+      "Pending organizations retrieved successfully",
+    );
+    return res.status(response.statusCode).json(response.toJSON());
+  }
+
+  async approveTenant(req: Request, res: Response) {
+    const { id } = req.params;
+    const tenant = await this.tenantService.approveTenant(id, req.user!.id);
+
+    if (!tenant) {
+      const error = createErrorResponse(
+        "Tenant not found or not pending review",
+        HttpStatus.NOT_FOUND,
+      );
+      return res.status(error.statusCode).json(error.toJSON());
+    }
+
+    const owner = await this.accountService.findById(String(tenant.ownerId));
+    if (owner?.email) {
+      await this.notify("org_approved", { email: owner.email, organizationName: tenant.name });
+    }
+
+    const response = createSuccessResponse(tenant, "Tenant approved successfully");
+    return res.status(response.statusCode).json(response.toJSON());
+  }
+
+  async rejectTenant(req: Request, res: Response) {
+    const { id } = req.params;
+    const { reason } = req.body as { reason?: string };
+    const tenant = await this.tenantService.rejectTenant(id, req.user!.id, reason);
+
+    if (!tenant) {
+      const error = createErrorResponse(
+        "Tenant not found or not pending review",
+        HttpStatus.NOT_FOUND,
+      );
+      return res.status(error.statusCode).json(error.toJSON());
+    }
+
+    const owner = await this.accountService.findById(String(tenant.ownerId));
+    if (owner?.email) {
+      await this.notify("org_rejected", {
+        email: owner.email,
+        organizationName: tenant.name,
+        reason,
+      });
+    }
+
+    const response = createSuccessResponse(tenant, "Tenant rejected");
     return res.status(response.statusCode).json(response.toJSON());
   }
 

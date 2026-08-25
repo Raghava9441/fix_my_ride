@@ -24,3 +24,4 @@ import "./subscriptionPlan.openapi";
 import "./subscription.openapi";
 import "./payment.openapi";
 import "./invoice.openapi";
+import "./onboarding.openapi";

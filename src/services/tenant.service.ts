@@ -209,6 +209,56 @@ export class TenantService {
     return tenant;
   }
 
+  async findPendingReview(filters?: { page?: number; limit?: number }): Promise<PaginatedResult<any>> {
+    const page = filters?.page || 1;
+    const limit = filters?.limit || 20;
+    const skip = (page - 1) * limit;
+
+    const query = { "onboarding.status": "pending_review", isDeleted: false };
+    const [tenants, total] = await Promise.all([
+      Tenant.find(query)
+        .populate("ownerId", "email")
+        .skip(skip)
+        .limit(limit)
+        .sort({ "onboarding.submittedAt": 1 }),
+      Tenant.countDocuments(query),
+    ]);
+
+    return {
+      data: tenants,
+      pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
+    };
+  }
+
+  async approveTenant(id: string, reviewedBy: string): Promise<any | null> {
+    return Tenant.findOneAndUpdate(
+      { _id: id, "onboarding.status": "pending_review", isDeleted: false },
+      {
+        $set: {
+          "onboarding.status": "approved",
+          "onboarding.reviewedAt": new Date(),
+          "onboarding.reviewedBy": new mongoose.Types.ObjectId(reviewedBy),
+        },
+      },
+      { new: true },
+    );
+  }
+
+  async rejectTenant(id: string, reviewedBy: string, reason?: string): Promise<any | null> {
+    return Tenant.findOneAndUpdate(
+      { _id: id, "onboarding.status": "pending_review", isDeleted: false },
+      {
+        $set: {
+          "onboarding.status": "rejected",
+          "onboarding.reviewedAt": new Date(),
+          "onboarding.reviewedBy": new mongoose.Types.ObjectId(reviewedBy),
+          "onboarding.rejectionReason": reason,
+        },
+      },
+      { new: true },
+    );
+  }
+
   async delete(id: string): Promise<any | null> {
     const tenant = await Tenant.findOneAndUpdate(
       { _id: id, isDeleted: false },

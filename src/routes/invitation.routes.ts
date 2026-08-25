@@ -14,10 +14,20 @@ import {
 import { IdParamSchema } from "../dto/account.dto";
 import { InvitationController } from "../controllers/invitation.controller";
 import { invitationService } from "../services/invitation.service";
+import { NotifyFn } from "../services/auth.service";
+import { enqueue } from "../services/queue.service";
+import { EMAIL_QUEUE } from "../workers";
 
 const router = Router();
 
-const invitationController = new InvitationController(invitationService);
+// Mirrors the identical local helper in auth.routes.ts / onboarding.routes.ts.
+const notify: NotifyFn = (type, payload) => {
+  void enqueue(EMAIL_QUEUE, { type, data: payload }).catch((err) => {
+    console.error("Failed to enqueue notification:", err);
+  });
+};
+
+const invitationController = new InvitationController(invitationService, notify);
 
 // Token validation is used by an invitee clicking an email link, before they
 // have a session — this must stay unauthenticated.

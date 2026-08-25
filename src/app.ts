@@ -42,6 +42,7 @@ import subscriptionRoutes from "./routes/subscription.routes";
 import paymentRoutes from "./routes/payment.routes";
 import invoiceRoutes from "./routes/invoice.routes";
 import webhookRoutes from "./routes/webhook.routes";
+import onboardingRoutes from "./routes/onboarding.routes";
 import publicRoutes from "./routes/public.routes";
 import accountRoutes from "./routes/account.routes";
 import healthRoutes from "./routes/health.routes";
@@ -199,6 +200,7 @@ app.use(
 );
 
 // API version 1 routes
+app.use("/api/v1/onboarding", onboardingRoutes);
 app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1/owners", ownerRoutes);
 app.use("/api/v1/staff", staffRoutes);

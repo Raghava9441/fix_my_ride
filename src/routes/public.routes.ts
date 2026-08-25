@@ -26,6 +26,5 @@ router.post(
   publicController.unsubscribeNewsletter,
 );
 router.get("/demo/request", publicController.requestDemo);
-router.get("/onboarding/status", publicController.getOnboardingStatus);
 
 export default router;

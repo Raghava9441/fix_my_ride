@@ -1,6 +1,7 @@
 import { Invitation, IInvitation } from "../models/Invitation";
 import { Vehicle } from "../models/Vehicle";
 import { ServiceCenter } from "../models/ServiceCenter";
+import { NotifyFn } from "./auth.service";
 import mongoose from "mongoose";
 
 export interface CreateInvitationInput {
@@ -24,6 +25,7 @@ export interface CreateInvitationInput {
   message?: string;
   maxUses?: number;
   expiresAt?: Date;
+  notify?: NotifyFn;
 }
 
 export interface InvitationFilters {
@@ -163,6 +165,16 @@ export class InvitationService {
       isDeleted: false,
     });
 
+    if (input.notify && invitation.inviteeEmail) {
+      await input.notify("invitation", {
+        email: invitation.inviteeEmail,
+        inviterName: input.inviterName,
+        invitationType: invitation.invitationType,
+        token: invitation.token,
+        message: input.message,
+      });
+    }
+
     return invitation;
   }
 
@@ -216,13 +228,26 @@ export class InvitationService {
     accessLevel?: string;
     permissions?: string[];
     message?: string;
+    notify?: NotifyFn;
   }): Promise<any> {
-    return Invitation.createVehicleAccess({
+    const invitation = await Invitation.createVehicleAccess({
       ...input,
       inviterId: new mongoose.Types.ObjectId(input.inviterId),
       vehicleId: new mongoose.Types.ObjectId(input.vehicleId),
       serviceCenterId: new mongoose.Types.ObjectId(input.serviceCenterId),
     });
+
+    if (input.notify && invitation.inviteeEmail) {
+      await input.notify("invitation", {
+        email: invitation.inviteeEmail,
+        inviterName: input.inviterName,
+        invitationType: invitation.invitationType,
+        token: invitation.token,
+        message: input.message,
+      });
+    }
+
+    return invitation;
   }
 }
 

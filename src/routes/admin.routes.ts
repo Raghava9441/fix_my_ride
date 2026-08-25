@@ -14,14 +14,25 @@ import { adminService } from "../services/admin.service";
 import { tenantService } from "../services/tenant.service";
 import { accountService } from "../services/account.service";
 import { auditLogService } from "../services/audit.service";
+import { NotifyFn } from "../services/auth.service";
+import { enqueue } from "../services/queue.service";
+import { EMAIL_QUEUE } from "../workers";
 
 const router = Router();
+
+// Mirrors the identical local helper in auth.routes.ts / onboarding.routes.ts.
+const notify: NotifyFn = (type, payload) => {
+  void enqueue(EMAIL_QUEUE, { type, data: payload }).catch((err) => {
+    console.error("Failed to enqueue notification:", err);
+  });
+};
 
 const adminController = new AdminController(
   adminService,
   tenantService,
   accountService,
   auditLogService,
+  notify,
 );
 
 // Everything under /api/v1/admin is platform-admin only.
@@ -53,6 +64,12 @@ router.post(
   }),
 );
 router.get(
+  "/tenants/pending",
+  asyncHandler(async (req: Request, res: Response) => {
+    await adminController.getPendingTenants(req, res);
+  }),
+);
+router.get(
   "/tenants/:id",
   validateParams(IdParamSchema),
   asyncHandler(async (req: Request, res: Response) => {
@@ -80,6 +97,20 @@ router.patch(
   validate(UpdateTenantStatusSchema),
   asyncHandler(async (req: Request, res: Response) => {
     await adminController.updateTenantStatus(req, res);
+  }),
+);
+router.post(
+  "/tenants/:id/approve",
+  validateParams(IdParamSchema),
+  asyncHandler(async (req: Request, res: Response) => {
+    await adminController.approveTenant(req, res);
+  }),
+);
+router.post(
+  "/tenants/:id/reject",
+  validateParams(IdParamSchema),
+  asyncHandler(async (req: Request, res: Response) => {
+    await adminController.rejectTenant(req, res);
   }),
 );
 router.get(

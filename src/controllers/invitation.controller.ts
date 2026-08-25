@@ -4,6 +4,7 @@ import {
   InvitationService,
   CreateInvitationInput,
 } from "../services/invitation.service";
+import { NotifyFn } from "../services/auth.service";
 import {
   HttpStatus,
   createSuccessResponse,
@@ -31,7 +32,10 @@ function toProfileType(
 }
 
 export class InvitationController {
-  constructor(private readonly invitationService: InvitationService) {}
+  constructor(
+    private readonly invitationService: InvitationService,
+    private readonly notify: NotifyFn,
+  ) {}
 
   async getAllInvitations(req: Request, res: Response) {
     const filters = {
@@ -127,6 +131,7 @@ export class InvitationController {
         accessLevel: data.accessLevel,
         permissions: data.permissions,
         message: data.message,
+        notify: this.notify,
       });
 
       const response = createSuccessResponse(
@@ -154,6 +159,7 @@ export class InvitationController {
       message: data.message,
       maxUses: data.maxUses,
       expiresAt: data.expiresAt ? new Date(data.expiresAt) : undefined,
+      notify: this.notify,
     };
 
     const invitation = await this.invitationService.create(input);

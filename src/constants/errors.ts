@@ -42,6 +42,8 @@ export const ERROR_CODES = {
   MFA_INVALID: def("AUTH_011", "auth.mfa_invalid", 401, "Invalid MFA code"),
   REFRESH_TOKEN_INVALID: def("AUTH_012", "auth.refresh_invalid", 401, "Refresh token is invalid or expired"),
   SESSION_EXPIRED: def("AUTH_013", "auth.session_expired", 401, "Your session has expired, please log in again"),
+  ORG_PENDING_APPROVAL: def("AUTH_014", "auth.org_pending_approval", 403, "Your organization is still awaiting review — we'll email you once it's approved"),
+  ORG_REJECTED: def("AUTH_015", "auth.org_rejected", 403, "Your organization's application was not approved"),
 
   // ─── Authorization (PERM_xxx) ────────────────────────────────────────────
   FORBIDDEN: def("PERM_001", "permission.denied", 403, "You do not have permission to perform this action"),

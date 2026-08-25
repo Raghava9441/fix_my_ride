@@ -179,16 +179,4 @@ export const publicController = {
       res.status(response.statusCode).json(response.toJSON());
     },
   ),
-
-  getOnboardingStatus: asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => {
-      const result = { step: 1, progress: "25%" };
-      const response = createSuccessResponse(
-        result,
-        "Onboarding status retrieved",
-        HttpStatus.OK,
-      );
-      res.status(response.statusCode).json(response.toJSON());
-    },
-  ),
 };

@@ -22,7 +22,6 @@ const endpoints: Array<["get" | "post", string, string]> = [
   ["post", "/newsletter/subscribe", "Subscribe to the newsletter"],
   ["post", "/newsletter/unsubscribe", "Unsubscribe from the newsletter"],
   ["get", "/demo/request", "Request a product demo"],
-  ["get", "/onboarding/status", "Get onboarding status"],
 ];
 
 for (const [method, path, summary] of endpoints) {

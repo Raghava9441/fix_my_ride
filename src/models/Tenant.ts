@@ -68,6 +68,19 @@ export interface ITenant extends Document {
   ownerId?: Types.ObjectId;
   isActive: boolean;
   isDeleted: boolean;
+
+  /** Self-serve signup review gate — see docs on the onboarding flow.
+   * Distinct from `isActive` (used for admin suspend/reactivate of an
+   * already-approved tenant) so "never reviewed" and "suspended" don't
+   * collide in the same boolean. */
+  onboarding: {
+    status: "pending_review" | "approved" | "rejected";
+    submittedAt: Date;
+    reviewedAt?: Date;
+    reviewedBy?: Types.ObjectId;
+    rejectionReason?: string;
+  };
+
   createdAt: Date;
   updatedAt: Date;
 
@@ -186,6 +199,23 @@ const tenantSchema = new Schema<ITenant, ITenantModel>(
     // Status
     isActive: { type: Boolean, default: true },
     isDeleted: { type: Boolean, default: false, index: true },
+
+    // Onboarding review gate. Defaults to "approved" — only the self-serve
+    // signup path (onboarding.service.ts) explicitly sets "pending_review"
+    // at creation. Tenants created via the platform-admin route or seed
+    // scripts are implicitly already reviewed (an admin creating one IS
+    // the approval) and shouldn't need a second gate.
+    onboarding: {
+      status: {
+        type: String,
+        enum: ["pending_review", "approved", "rejected"],
+        default: "approved",
+      },
+      submittedAt: { type: Date, default: Date.now },
+      reviewedAt: Date,
+      reviewedBy: { type: Schema.Types.ObjectId, ref: "Account" },
+      rejectionReason: String,
+    },
   },
   { timestamps: true },
 );

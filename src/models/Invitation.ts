@@ -279,9 +279,22 @@ invitationSchema.methods.accept = async function(
   return this.save();
 };
 
+// Invitation.role -> system Role slug (see Role.seedSystemRoles). No exact
+// match exists for 'viewer'/'owner' at the center_staff level, so they fall
+// back to the closest reasonable role rather than leaving staff unassigned.
+const CENTER_STAFF_ROLE_SLUGS: Record<string, string> = {
+  manager: 'center_manager',
+  technician: 'technician',
+  receptionist: 'receptionist',
+  accountant: 'accountant',
+  admin: 'tenant_admin',
+  owner: 'tenant_admin',
+  viewer: 'technician',
+};
+
 invitationSchema.methods.grantAccess = async function(userId: mongoose.Types.ObjectId): Promise<void> {
   const Vehicle = mongoose.model('Vehicle');
-  
+
   if (this.invitationType === 'vehicle_access' && this.vehicleId) {
     await Vehicle.findByIdAndUpdate(this.vehicleId, {
       $push: {
@@ -293,6 +306,24 @@ invitationSchema.methods.grantAccess = async function(userId: mongoose.Types.Obj
           authorizedAt: new Date()
         }
       }
+    });
+  } else if (this.invitationType === 'center_staff' && this.serviceCenterId) {
+    const StaffProfile = mongoose.model('StaffProfile');
+    const Role = mongoose.model('Role');
+
+    // Idempotent: someone accepting a second center_staff invite (or a
+    // re-sent one) shouldn't get a duplicate StaffProfile.
+    const existing = await StaffProfile.findOne({ accountId: userId });
+    if (existing) return;
+
+    const roleSlug = CENTER_STAFF_ROLE_SLUGS[this.role] || 'technician';
+    const role = await Role.findOne({ slug: roleSlug, type: 'system' });
+    if (!role) return; // system roles not seeded yet — nothing to assign
+
+    await StaffProfile.create({
+      accountId: userId,
+      serviceCenterId: this.serviceCenterId,
+      roleId: role._id,
     });
   }
   // Add other invitation types as needed

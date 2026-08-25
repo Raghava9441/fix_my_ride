@@ -92,10 +92,40 @@ registry.registerPath({
   method: "patch",
   path: "/api/v1/admin/tenants/{id}/status",
   tags: TAGS,
-  summary: "Activate/deactivate a tenant (admin only)",
+  summary: "Activate/deactivate/suspend a tenant (admin only)",
   security: BEARER_AUTH,
-  request: { params: IdParamSchema, ...jsonBody(z.object({ isActive: z.boolean() })) },
+  request: { params: IdParamSchema, ...jsonBody(z.object({ status: z.enum(["active", "inactive", "suspended", "cancelled"]) })) },
   responses: { 200: { description: "Status updated", content: { "application/json": { schema: successEnvelope("AdminTenantStatusResponse", z.object({ id: z.string(), isActive: z.boolean() })) } } }, ...adminErrors() },
+});
+
+registry.registerPath({
+  method: "get",
+  path: "/api/v1/admin/tenants/pending",
+  tags: TAGS,
+  summary: "List organizations awaiting onboarding review (admin only)",
+  security: BEARER_AUTH,
+  request: { query: PaginationQuerySchema },
+  responses: { 200: { description: "Pending organizations", content: { "application/json": { schema: paginatedEnvelope("AdminPendingTenantListResponse", record) } } }, ...adminErrors() },
+});
+
+registry.registerPath({
+  method: "post",
+  path: "/api/v1/admin/tenants/{id}/approve",
+  tags: TAGS,
+  summary: "Approve a pending organization, unblocking login for its owner (admin only)",
+  security: BEARER_AUTH,
+  request: { params: IdParamSchema },
+  responses: { 200: { description: "Tenant approved", content: { "application/json": { schema: successEnvelope("AdminTenantResponse", record) } } }, ...adminErrors() },
+});
+
+registry.registerPath({
+  method: "post",
+  path: "/api/v1/admin/tenants/{id}/reject",
+  tags: TAGS,
+  summary: "Reject a pending organization's application (admin only)",
+  security: BEARER_AUTH,
+  request: { params: IdParamSchema, ...jsonBody(z.object({ reason: z.string().optional() })) },
+  responses: { 200: { description: "Tenant rejected", content: { "application/json": { schema: successEnvelope("AdminTenantResponse", record) } } }, ...adminErrors() },
 });
 
 registry.registerPath({
