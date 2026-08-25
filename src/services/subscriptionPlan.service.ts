@@ -1,6 +1,6 @@
 import { SubscriptionPlan } from "../models/SubscriptionPlan";
-import { Permission } from "../models/Permission";
-import mongoose from "mongoose";
+import { getRazorpayClient } from "../config/razorpay";
+import { logger } from "../config/logger";
 
 export interface CreateSubscriptionPlanInput {
   name: string;
@@ -76,6 +76,46 @@ export interface PaginatedResult<T> {
 }
 
 export class SubscriptionPlanService {
+  /**
+   * Razorpay plans are immutable once created (the SDK has no edit/delete
+   * for plans.create) — so "updating" a plan's price/interval/name means
+   * registering a brand-new Razorpay plan and swapping providerPriceId,
+   * not editing the old one in place. The old Razorpay plan is simply left
+   * unused; Razorpay doesn't require cleanup of plans with no subscriptions.
+   * Returns undefined (skips registration) when Razorpay isn't configured
+   * or the plan is free, so local dev without real keys still works.
+   */
+  private async registerRazorpayPlan(
+    name: string,
+    price: number,
+    currency: string,
+    billingInterval: "month" | "year",
+  ): Promise<string | undefined> {
+    if (price <= 0) return undefined;
+
+    const client = getRazorpayClient();
+    if (!client) {
+      logger.warn({
+        type: "razorpay_plan_registration_skipped",
+        message: "Razorpay not configured — plan created without a providerPriceId",
+        name,
+      });
+      return undefined;
+    }
+
+    const result = await client.plans.create({
+      period: billingInterval === "year" ? "yearly" : "monthly",
+      interval: 1,
+      item: {
+        name,
+        amount: Math.round(price * 100),
+        currency,
+      },
+    });
+
+    return result.id;
+  }
+
   async findAll(
     filters?: SubscriptionPlanFilters,
   ): Promise<PaginatedResult<any>> {
@@ -139,14 +179,20 @@ export class SubscriptionPlanService {
       throw new Error("Plan with this slug already exists");
     }
 
+    const currency = input.currency || "USD";
+    const billingInterval = input.billingInterval || "month";
+    const providerPriceId =
+      input.providerPriceId ??
+      (await this.registerRazorpayPlan(input.name, input.price, currency, billingInterval));
+
     const plan = await SubscriptionPlan.create({
       name: input.name,
       slug: input.slug,
       description: input.description,
       type: input.type,
       price: input.price,
-      currency: input.currency || "USD",
-      billingInterval: input.billingInterval || "month",
+      currency,
+      billingInterval,
       trialDays: input.trialDays || 14,
       limits: input.limits || {
         maxVehicles: 3,
@@ -159,7 +205,7 @@ export class SubscriptionPlanService {
       },
       features: input.features || [],
       includedPermissions: [],
-      providerPriceId: input.providerPriceId,
+      providerPriceId,
       providerProductId: input.providerProductId,
       isActive: true,
       isPublic: true,
@@ -175,7 +221,26 @@ export class SubscriptionPlanService {
     id: string,
     updates: UpdateSubscriptionPlanInput,
   ): Promise<any | null> {
-    const plan = await SubscriptionPlan.findByIdAndUpdate(id, updates, {
+    const existing = await SubscriptionPlan.findOne({ _id: id, isDeleted: false });
+    if (!existing) return null;
+
+    const patch: UpdateSubscriptionPlanInput & { providerPriceId?: string } = { ...updates };
+
+    const priceChanged = updates.price !== undefined && updates.price !== existing.price;
+    const intervalChanged =
+      updates.billingInterval !== undefined && updates.billingInterval !== existing.billingInterval;
+    const nameChanged = updates.name !== undefined && updates.name !== existing.name;
+
+    if (priceChanged || intervalChanged || nameChanged) {
+      patch.providerPriceId = await this.registerRazorpayPlan(
+        updates.name ?? existing.name,
+        updates.price ?? existing.price,
+        existing.currency,
+        updates.billingInterval ?? existing.billingInterval,
+      );
+    }
+
+    const plan = await SubscriptionPlan.findByIdAndUpdate(id, patch, {
       new: true,
       runValidators: true,
     });
