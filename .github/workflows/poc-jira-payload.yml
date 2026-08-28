@@ -1,0 +1,29 @@
+name: POC - Jira Payload Sync
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {} # lets you re-run manually from the Actions tab for testing
+
+jobs:
+  sync-payload:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # full history needed to compute the AI-vs-human line-change ratio
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Generate payload
+        run: node scripts/generate-payload.js
+        env:
+          JIRA_CUSTOM_FIELD_ID: ${{ secrets.JIRA_CUSTOM_FIELD_ID }}
+
+      - name: Call external API (Jira stand-in)
+        run: node scripts/call-external-api.js
+        env:
+          EXTERNAL_API_URL: ${{ secrets.EXTERNAL_API_URL }}
+          JIRA_ACCESS_TOKEN: ${{ secrets.JIRA_ACCESS_TOKEN }}
