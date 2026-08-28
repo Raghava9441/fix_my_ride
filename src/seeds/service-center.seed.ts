@@ -39,6 +39,14 @@ export const seedServiceCenter = async (
       return;
     }
 
+    const freePlan = await SubscriptionPlan.findOne({ slug: "free" });
+    if (!freePlan) {
+      console.log(
+        "  ⚠️  No 'free' subscription plan found, skipping service center creation",
+      );
+      return;
+    }
+
     const serviceCenter = new ServiceCenter({
       tenantId,
       name: "Main Service Center",
@@ -52,10 +60,13 @@ export const seedServiceCenter = async (
         state: "CA",
         country: "US",
         postalCode: "94102",
-        coordinates: [-122.4194, 37.7749],
+        coordinates: {
+          type: "Point",
+          coordinates: [-122.4194, 37.7749],
+        },
       },
       subscription: {
-        planId: undefined, // Will be set from tenant
+        planId: freePlan._id,
         status: "active",
         startedAt: new Date(),
         expiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000), // 1 year
@@ -119,15 +130,12 @@ export const seedServiceCenter = async (
     // Update tenant subscription with service center reference
     const tenant = await Tenant.findById(tenantId);
     if (tenant && !tenant.subscription.planId) {
-      const freePlan = await SubscriptionPlan.findOne({ slug: "free" });
-      if (freePlan) {
-        tenant.subscription.planId = freePlan._id;
-        tenant.subscription.status = "trial";
-        tenant.subscription.trialEndsAt = new Date(
-          Date.now() + 14 * 24 * 60 * 60 * 1000,
-        );
-        await tenant.save();
-      }
+      tenant.subscription.planId = freePlan._id;
+      tenant.subscription.status = "trial";
+      tenant.subscription.trialEndsAt = new Date(
+        Date.now() + 14 * 24 * 60 * 60 * 1000,
+      );
+      await tenant.save();
     }
   } catch (error) {
     console.error("  ❌ Error seeding service center:", error);

@@ -22,7 +22,11 @@ export const config = {
   isTest: env.NODE_ENV === "test",
   isDevelopment: env.NODE_ENV === "development",
 
-  port: env.PORT,
+  // Catalyst AppSail assigns the listen port at runtime via this var, which
+  // isn't declared in schema.ts since it's platform-injected, not configured.
+  port: process.env.X_ZOHO_CATALYST_LISTEN_PORT
+    ? Number(process.env.X_ZOHO_CATALYST_LISTEN_PORT)
+    : env.PORT,
   host: env.HOST,
   appUrl: env.APP_URL ?? `http://localhost:${env.PORT}`,
 

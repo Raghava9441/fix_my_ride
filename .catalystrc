@@ -1,0 +1,30 @@
+{
+  "defaults": {
+    "project": 1,
+    "env": 1
+  },
+  "actives": {
+    "project": 1,
+    "env": 1
+  },
+  "projects": [
+    {
+      "idx": 1,
+      "id": "65555000000016002",
+      "name": "fixMyRide",
+      "domain": {
+        "id": "50045355971",
+        "name": "fixmyride-60085154906.development"
+      },
+      "timezone": "Asia/Kolkata",
+      "env": [
+        {
+          "idx": 1,
+          "id": "60085154906",
+          "name": "Development",
+          "type": 3
+        }
+      ]
+    }
+  ]
+}

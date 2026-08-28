@@ -30,7 +30,9 @@ export const tenantIsolation = (
       return next();
     }
 
-    const userRoles = (req as any).user?.roles ?? [(req as any).user?.role];
+    const userRoles = (req as any).user
+      ? ((req as any).user.roles ?? [(req as any).user.role])
+      : undefined;
     const isAdmin = Array.isArray(userRoles) && userRoles.includes("admin");
 
     // Already resolved from JWT by auth middleware.
