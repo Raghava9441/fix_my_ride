@@ -6,6 +6,7 @@
 const { execFileSync } = require("child_process");
 const fs = require("fs");
 
+
 const CUSTOM_FIELD_ID = process.env.JIRA_CUSTOM_FIELD_ID || "customfield_10050";
 const COMMIT_MARKER = "@@COMMIT@@";
 
