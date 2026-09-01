@@ -5,6 +5,7 @@ import { ServiceRecord } from "../models/ServiceRecord";
 import { StaffProfile } from "../models/StaffProfile";
 import { ServiceCenter } from "../models/ServiceCenter";
 import { Tenant } from "../models/Tenant";
+import { Account } from "../models/Account";
 import { Payment } from "../models/Payment";
 import { serviceRecordService } from "./serviceRecord.service";
 import { ownerProfileService } from "./owner.service";
@@ -14,7 +15,390 @@ function toDate(value: string | undefined, fallback: Date): Date {
   return value ? new Date(value) : fallback;
 }
 
+/** A KPI plus the same measure over the preceding, equal-length window. */
+function delta(current: number, previous: number) {
+  // A jump from zero is "new", not "+Infinity%" — the client renders `null`
+  // as a dash rather than a meaningless percentage.
+  const changePct =
+    previous === 0 ? (current === 0 ? 0 : null) : Math.round(((current - previous) / previous) * 1000) / 10;
+  return { value: current, previous, changePct };
+}
+
+/** Zero-fills a daily series so a quiet day is a gap in the line, not a missing point. */
+function fillDailySeries(
+  rows: { _id: string; revenue?: number; jobs?: number }[],
+  start: Date,
+  end: Date,
+): { date: string; revenue: number; jobs: number }[] {
+  const byDate = new Map(rows.map((r) => [r._id, r]));
+  const out: { date: string; revenue: number; jobs: number }[] = [];
+
+  const cursor = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), start.getUTCDate()));
+  const last = new Date(Date.UTC(end.getUTCFullYear(), end.getUTCMonth(), end.getUTCDate()));
+
+  while (cursor <= last) {
+    const key = cursor.toISOString().slice(0, 10);
+    const row = byDate.get(key);
+    out.push({ date: key, revenue: row?.revenue ?? 0, jobs: row?.jobs ?? 0 });
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+  }
+
+  return out;
+}
+
 export class ReportService {
+  // ─── Dashboard overview ─────────────────────────────────────────────────
+
+  /**
+   * Everything the dashboard renders, in one round trip.
+   *
+   * Built as a single endpoint rather than letting the client assemble six
+   * calls: a dashboard that fans out on mount pays six times the latency, and
+   * its KPI tiles land at different moments so the page visibly reflows. The
+   * aggregations here also share a `$match`, so the database does the work
+   * once instead of scanning the same collection six times.
+   *
+   * Every KPI carries the same measure over the immediately preceding window
+   * of equal length, so the UI can show direction without a second request.
+   */
+  async getCenterOverview(serviceCenterId: string, days = 30) {
+    const centerObjId = new mongoose.Types.ObjectId(serviceCenterId);
+    const end = new Date();
+    const start = new Date(end.getTime() - days * 24 * 60 * 60 * 1000);
+    const prevStart = new Date(start.getTime() - days * 24 * 60 * 60 * 1000);
+
+    const inPeriod = { serviceCenterId: centerObjId, isDeleted: false, serviceDate: { $gte: start, $lte: end } };
+    const inPrevPeriod = {
+      serviceCenterId: centerObjId,
+      isDeleted: false,
+      serviceDate: { $gte: prevStart, $lt: start },
+    };
+
+    const sumRevenue = async (match: Record<string, unknown>) => {
+      const [row] = await ServiceRecord.aggregate([
+        { $match: { ...match, status: "completed" } },
+        { $group: { _id: null, total: { $sum: "$cost.total" }, count: { $sum: 1 } } },
+      ]);
+      return { total: row?.total ?? 0, count: row?.count ?? 0 };
+    };
+
+    const [
+      revenueNow,
+      revenuePrev,
+      jobsNow,
+      jobsPrev,
+      customersNow,
+      customersPrev,
+      vehiclesActive,
+      trendRows,
+      byStatus,
+      byType,
+      recent,
+      upcomingReminders,
+      overdueReminders,
+    ] = await Promise.all([
+      sumRevenue(inPeriod),
+      sumRevenue(inPrevPeriod),
+      ServiceRecord.countDocuments(inPeriod),
+      ServiceRecord.countDocuments(inPrevPeriod),
+      ServiceRecord.distinct("ownerId", inPeriod),
+      ServiceRecord.distinct("ownerId", inPrevPeriod),
+      Vehicle.countDocuments({
+        "authorizedServiceCenters.serviceCenterId": centerObjId,
+        "authorizedServiceCenters.status": "active",
+        isDeleted: false,
+      }),
+
+      // Daily revenue and job count for the trend chart.
+      ServiceRecord.aggregate([
+        { $match: inPeriod },
+        {
+          $group: {
+            _id: { $dateToString: { format: "%Y-%m-%d", date: "$serviceDate" } },
+            revenue: { $sum: { $cond: [{ $eq: ["$status", "completed"] }, "$cost.total", 0] } },
+            jobs: { $sum: 1 },
+          },
+        },
+        { $sort: { _id: 1 } },
+      ]),
+
+      ServiceRecord.aggregate([
+        { $match: inPeriod },
+        { $group: { _id: "$status", count: { $sum: 1 } } },
+        { $project: { _id: 0, status: "$_id", count: 1 } },
+      ]),
+
+      ServiceRecord.aggregate([
+        { $match: inPeriod },
+        {
+          $group: {
+            _id: "$serviceType",
+            count: { $sum: 1 },
+            revenue: { $sum: { $cond: [{ $eq: ["$status", "completed"] }, "$cost.total", 0] } },
+          },
+        },
+        { $sort: { count: -1 } },
+        { $limit: 6 },
+        { $project: { _id: 0, serviceType: "$_id", count: 1, revenue: 1 } },
+      ]),
+
+      ServiceRecord.find({ serviceCenterId: centerObjId, isDeleted: false })
+        .sort({ serviceDate: -1 })
+        .limit(8)
+        .populate("vehicleId", "registrationNumber make model year")
+        .lean(),
+
+      reminderService.findUpcoming("", 30).catch(() => []),
+      reminderService.findOverdue().catch(() => []),
+    ]);
+
+    const completed = byStatus.find((s: { status: string }) => s.status === "completed")?.count ?? 0;
+
+    return {
+      scope: "center" as const,
+      generatedAt: new Date().toISOString(),
+      // Taken from the data rather than assumed: the dashboard renders
+      // aggregate totals and per-record costs side by side, and defaulting
+      // one of them to a different currency shows the same money in two
+      // symbols on the same screen.
+      currency: (recent[0] as { cost?: { currency?: string } } | undefined)?.cost?.currency ?? "USD",
+      period: { days, start: start.toISOString(), end: end.toISOString() },
+
+      kpis: {
+        revenue: delta(revenueNow.total, revenuePrev.total),
+        jobs: delta(jobsNow, jobsPrev),
+        customers: delta(customersNow.length, customersPrev.length),
+        activeVehicles: delta(vehiclesActive, vehiclesActive),
+        // Average repair order — the headline profitability metric in this
+        // industry, and not derivable client-side without the completed count.
+        averageRepairOrder: delta(
+          revenueNow.count ? Math.round(revenueNow.total / revenueNow.count) : 0,
+          revenuePrev.count ? Math.round(revenuePrev.total / revenuePrev.count) : 0,
+        ),
+        completionRate: delta(
+          jobsNow ? Math.round((completed / jobsNow) * 100) : 0,
+          0,
+        ),
+      },
+
+      revenueTrend: fillDailySeries(trendRows, start, end),
+      jobsByStatus: byStatus,
+      jobsByType: byType,
+      recentServiceRecords: recent,
+      reminders: {
+        upcoming: Array.isArray(upcomingReminders) ? upcomingReminders.slice(0, 6) : [],
+        overdueCount: Array.isArray(overdueReminders) ? overdueReminders.length : 0,
+      },
+    };
+  }
+
+  /** The same shape for a vehicle owner: their fleet, their spend, their reminders. */
+  async getOwnerOverview(ownerId: string, days = 30) {
+    const ownerObjId = new mongoose.Types.ObjectId(ownerId);
+    const end = new Date();
+    const start = new Date(end.getTime() - days * 24 * 60 * 60 * 1000);
+    const prevStart = new Date(start.getTime() - days * 24 * 60 * 60 * 1000);
+
+    const inPeriod = { ownerId: ownerObjId, isDeleted: false, serviceDate: { $gte: start, $lte: end } };
+    const inPrevPeriod = {
+      ownerId: ownerObjId,
+      isDeleted: false,
+      serviceDate: { $gte: prevStart, $lt: start },
+    };
+
+    const spend = async (match: Record<string, unknown>) => {
+      const [row] = await ServiceRecord.aggregate([
+        { $match: { ...match, status: "completed" } },
+        { $group: { _id: null, total: { $sum: "$cost.total" }, count: { $sum: 1 } } },
+      ]);
+      return { total: row?.total ?? 0, count: row?.count ?? 0 };
+    };
+
+    const [spendNow, spendPrev, jobsNow, jobsPrev, vehicleCount, trendRows, byStatus, byType, recent, upcoming, overdue] =
+      await Promise.all([
+        spend(inPeriod),
+        spend(inPrevPeriod),
+        ServiceRecord.countDocuments(inPeriod),
+        ServiceRecord.countDocuments(inPrevPeriod),
+        Vehicle.countDocuments({ currentOwnerId: ownerObjId, isDeleted: false }),
+        ServiceRecord.aggregate([
+          { $match: inPeriod },
+          {
+            $group: {
+              _id: { $dateToString: { format: "%Y-%m-%d", date: "$serviceDate" } },
+              revenue: { $sum: { $cond: [{ $eq: ["$status", "completed"] }, "$cost.total", 0] } },
+              jobs: { $sum: 1 },
+            },
+          },
+          { $sort: { _id: 1 } },
+        ]),
+        ServiceRecord.aggregate([
+          { $match: inPeriod },
+          { $group: { _id: "$status", count: { $sum: 1 } } },
+          { $project: { _id: 0, status: "$_id", count: 1 } },
+        ]),
+        ServiceRecord.aggregate([
+          { $match: inPeriod },
+          {
+            $group: {
+              _id: "$serviceType",
+              count: { $sum: 1 },
+              revenue: { $sum: { $cond: [{ $eq: ["$status", "completed"] }, "$cost.total", 0] } },
+            },
+          },
+          { $sort: { count: -1 } },
+          { $limit: 6 },
+          { $project: { _id: 0, serviceType: "$_id", count: 1, revenue: 1 } },
+        ]),
+        ServiceRecord.find({ ownerId: ownerObjId, isDeleted: false })
+          .sort({ serviceDate: -1 })
+          .limit(8)
+          .populate("vehicleId", "registrationNumber make model year")
+          .lean(),
+        reminderService.findUpcoming(ownerId, 30).catch(() => []),
+        reminderService.findOverdue(ownerId).catch(() => []),
+      ]);
+
+    const completed = byStatus.find((s: { status: string }) => s.status === "completed")?.count ?? 0;
+
+    return {
+      scope: "owner" as const,
+      generatedAt: new Date().toISOString(),
+      currency: (recent[0] as { cost?: { currency?: string } } | undefined)?.cost?.currency ?? "USD",
+      period: { days, start: start.toISOString(), end: end.toISOString() },
+
+      kpis: {
+        revenue: delta(spendNow.total, spendPrev.total),
+        jobs: delta(jobsNow, jobsPrev),
+        customers: delta(0, 0),
+        activeVehicles: delta(vehicleCount, vehicleCount),
+        averageRepairOrder: delta(
+          spendNow.count ? Math.round(spendNow.total / spendNow.count) : 0,
+          spendPrev.count ? Math.round(spendPrev.total / spendPrev.count) : 0,
+        ),
+        completionRate: delta(jobsNow ? Math.round((completed / jobsNow) * 100) : 0, 0),
+      },
+
+      revenueTrend: fillDailySeries(trendRows, start, end),
+      jobsByStatus: byStatus,
+      jobsByType: byType,
+      recentServiceRecords: recent,
+      reminders: {
+        upcoming: Array.isArray(upcoming) ? upcoming.slice(0, 6) : [],
+        overdueCount: Array.isArray(overdue) ? overdue.length : 0,
+      },
+    };
+  }
+
+  /**
+   * Platform-wide overview for an admin.
+   *
+   * Runs unscoped on purpose: the tenant plugin bypasses its `$match` when the
+   * requester carries the `admin` role, which is what makes a cross-tenant
+   * rollup possible at all. Only reachable behind the admin check in the
+   * controller.
+   */
+  async getPlatformOverview(days = 30) {
+    const end = new Date();
+    const start = new Date(end.getTime() - days * 24 * 60 * 60 * 1000);
+    const prevStart = new Date(start.getTime() - days * 24 * 60 * 60 * 1000);
+
+    const inPeriod = { isDeleted: false, serviceDate: { $gte: start, $lte: end } };
+    const inPrevPeriod = { isDeleted: false, serviceDate: { $gte: prevStart, $lt: start } };
+
+    const sumRevenue = async (match: Record<string, unknown>) => {
+      const [row] = await ServiceRecord.aggregate([
+        { $match: { ...match, status: "completed" } },
+        { $group: { _id: null, total: { $sum: "$cost.total" }, count: { $sum: 1 } } },
+      ]);
+      return { total: row?.total ?? 0, count: row?.count ?? 0 };
+    };
+
+    const [
+      revenueNow,
+      revenuePrev,
+      jobsNow,
+      jobsPrev,
+      tenants,
+      users,
+      vehicles,
+      trendRows,
+      byStatus,
+      byType,
+      recent,
+    ] = await Promise.all([
+      sumRevenue(inPeriod),
+      sumRevenue(inPrevPeriod),
+      ServiceRecord.countDocuments(inPeriod),
+      ServiceRecord.countDocuments(inPrevPeriod),
+      Tenant.countDocuments({ isDeleted: false }),
+      Account.countDocuments({ isDeleted: false }),
+      Vehicle.countDocuments({ isDeleted: false }),
+      ServiceRecord.aggregate([
+        { $match: inPeriod },
+        {
+          $group: {
+            _id: { $dateToString: { format: "%Y-%m-%d", date: "$serviceDate" } },
+            revenue: { $sum: { $cond: [{ $eq: ["$status", "completed"] }, "$cost.total", 0] } },
+            jobs: { $sum: 1 },
+          },
+        },
+        { $sort: { _id: 1 } },
+      ]),
+      ServiceRecord.aggregate([
+        { $match: inPeriod },
+        { $group: { _id: "$status", count: { $sum: 1 } } },
+        { $project: { _id: 0, status: "$_id", count: 1 } },
+      ]),
+      ServiceRecord.aggregate([
+        { $match: inPeriod },
+        {
+          $group: {
+            _id: "$serviceType",
+            count: { $sum: 1 },
+            revenue: { $sum: { $cond: [{ $eq: ["$status", "completed"] }, "$cost.total", 0] } },
+          },
+        },
+        { $sort: { count: -1 } },
+        { $limit: 6 },
+        { $project: { _id: 0, serviceType: "$_id", count: 1, revenue: 1 } },
+      ]),
+      ServiceRecord.find({ isDeleted: false })
+        .sort({ serviceDate: -1 })
+        .limit(8)
+        .populate("vehicleId", "registrationNumber make model year")
+        .lean(),
+    ]);
+
+    const completed = byStatus.find((s: { status: string }) => s.status === "completed")?.count ?? 0;
+
+    return {
+      scope: "platform" as const,
+      generatedAt: new Date().toISOString(),
+      currency: (recent[0] as { cost?: { currency?: string } } | undefined)?.cost?.currency ?? "USD",
+      period: { days, start: start.toISOString(), end: end.toISOString() },
+
+      kpis: {
+        revenue: delta(revenueNow.total, revenuePrev.total),
+        jobs: delta(jobsNow, jobsPrev),
+        customers: delta(users, users),
+        activeVehicles: delta(vehicles, vehicles),
+        averageRepairOrder: delta(
+          revenueNow.count ? Math.round(revenueNow.total / revenueNow.count) : 0,
+          revenuePrev.count ? Math.round(revenuePrev.total / revenuePrev.count) : 0,
+        ),
+        completionRate: delta(jobsNow ? Math.round((completed / jobsNow) * 100) : 0, 0),
+      },
+
+      tenants,
+      revenueTrend: fillDailySeries(trendRows, start, end),
+      jobsByStatus: byStatus,
+      jobsByType: byType,
+      recentServiceRecords: recent,
+      reminders: { upcoming: [], overdueCount: 0 },
+    };
+  }
+
   // ─── Service center reports ────────────────────────────────────────────
 
   async getCenterDashboard(serviceCenterId: string) {

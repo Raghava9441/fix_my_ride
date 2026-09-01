@@ -4,7 +4,7 @@
     {
       "name": "frontend",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev", "--prefix", "frontend"],
+      "runtimeArgs": ["run", "dev", "--prefix", "../fix_my_ride_fe"],
       "port": 5173
     }
   ]

@@ -14,6 +14,11 @@ const reportController = new ReportController(reportService, staffProfileService
 
 router.use(authenticate);
 
+// Everything the dashboard renders, scope-resolved from the caller. Declared
+// before `/dashboard` only for readability — the paths don't overlap.
+router.get("/overview", asyncHandler(async (req: Request, res: Response) => {
+  await reportController.getOverview(req, res);
+}));
 router.get("/dashboard", asyncHandler(async (req: Request, res: Response) => {
   await reportController.getDashboard(req, res);
 }));
