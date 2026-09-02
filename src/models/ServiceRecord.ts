@@ -34,6 +34,28 @@ export interface IServiceRecord extends Document {
     totalCost?: number;
     warrantyMonths?: number;
   }>;
+  /*
+   * Itemised labour.
+   *
+   * `cost.laborTotal` remains the figure invoices and reports read; this
+   * breaks it down into the lines that produced it. Kept as a sub-document
+   * array for the same reason as `partsReplaced`: labour lines have no
+   * meaning outside the job they belong to and are never queried alone.
+   */
+  laborItems: Types.DocumentArray<{
+    description?: string;
+    hours?: number;
+    rate?: number;
+    total?: number;
+    technicianId?: Types.ObjectId;
+  }>;
+
+  feedback?: {
+    rating?: number;
+    comment?: string;
+    submittedAt?: Date;
+  };
+
   nextService?: {
     recommendedDate?: Date;
     recommendedOdometer?: number;
@@ -105,6 +127,21 @@ const serviceRecordSchema = new Schema<IServiceRecord, IServiceRecordModel>({
     totalCost: Number,
     warrantyMonths: Number
   }],
+
+  // Itemised labour behind cost.laborTotal
+  laborItems: [{
+    description: String,
+    hours: Number,
+    rate: Number,
+    total: Number,
+    technicianId: { type: Schema.Types.ObjectId, ref: 'StaffProfile' }
+  }],
+
+  feedback: {
+    rating: { type: Number, min: 1, max: 5 },
+    comment: String,
+    submittedAt: Date
+  },
 
   // Next Service
   nextService: {

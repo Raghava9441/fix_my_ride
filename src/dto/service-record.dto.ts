@@ -11,9 +11,17 @@ const ObjectIdSchema = z
 export const CreateServiceRecordSchema = z.object({
   tenantId: ObjectIdSchema.optional(),
   vehicleId: ObjectIdSchema,
-  serviceCenterId: ObjectIdSchema,
+  /*
+   * Optional on the wire; the controller resolves them.
+   *
+   * A client booking a job knows the vehicle. It does not know the owner's
+   * profile id (that's a property of the vehicle) or, for staff, its own
+   * service centre id — and requiring both made every create from the UI fail
+   * validation with no field to point at.
+   */
+  serviceCenterId: ObjectIdSchema.optional(),
   technicianId: ObjectIdSchema.optional(),
-  ownerId: ObjectIdSchema,
+  ownerId: ObjectIdSchema.optional(),
   serviceDate: z.string().datetime().default(new Date().toISOString()),
   serviceType: z.enum([
     "oil_change",
@@ -29,7 +37,10 @@ export const CreateServiceRecordSchema = z.object({
     unit: z.enum(["km", "miles"]).default("km"),
   }),
   description: z.string().min(1),
-  cost: z.object({
+  // A newly booked job has no costs yet; they accrue as parts and labour are
+  // added. Defaulted rather than required.
+  cost: z
+    .object({
     partsTotal: z.number().min(0).default(0),
     laborTotal: z.number().min(0).default(0),
     subtotal: z.number().min(0).default(0),
@@ -40,8 +51,9 @@ export const CreateServiceRecordSchema = z.object({
     paymentStatus: z
       .enum(["pending", "paid", "partial", "waived"])
       .default("pending"),
-    invoiceNumber: z.string().optional(),
-  }),
+      invoiceNumber: z.string().optional(),
+    })
+    .default({}),
   partsReplaced: z
     .array(
       z.object({
@@ -64,10 +76,11 @@ export const CreateServiceRecordSchema = z.object({
   status: z
     .enum(["scheduled", "in_progress", "completed", "cancelled"])
     .default("scheduled"),
-  createdBy: z.object({
-    accountId: ObjectIdSchema,
-    role: z.enum(["owner", "staff"]),
-  }),
+  /*
+   * Deliberately not accepted from the client. Whoever created a record is a
+   * fact about the session, and taking it from the request body would let a
+   * caller attribute their work to somebody else.
+   */
 });
 
 export const UpdateServiceRecordSchema = z
@@ -134,6 +147,13 @@ export const AddLaborSchema = z.object({
   hours: z.number().min(0),
   rate: z.number().min(0),
   total: z.number().min(0),
+});
+
+export const UpdateLaborSchema = z.object({
+  description: z.string().min(1).optional(),
+  hours: z.number().min(0).optional(),
+  rate: z.number().min(0).optional(),
+  total: z.number().min(0).optional(),
 });
 
 export const UpdateStatusSchema = z.object({
