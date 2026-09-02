@@ -29,6 +29,7 @@ import { vehicleService } from "../services/vehicle.service";
 import { documentService } from "../services/document.service";
 import { reminderService } from "../services/reminder.service";
 import { odometerReadingService } from "../services/odometerReading.service";
+import { ownerProfileService } from "../services/owner.service";
 
 const router = Router();
 
@@ -36,6 +37,7 @@ const vehicleController = new VehicleController(
   vehicleService,
   documentService,
   reminderService,
+  ownerProfileService,
 );
 
 const odometerReadingController = new OdometerReadingController(odometerReadingService);

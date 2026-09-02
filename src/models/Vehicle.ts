@@ -52,6 +52,28 @@ export interface IVehicle extends Omit<Document, 'model'> {
     nextServiceDueOdometer?: number;
   };
 
+  // Policies attached to the vehicle. Both are optional sub-documents rather
+  // than separate collections: there is exactly one live warranty and one live
+  // insurance policy per vehicle, and neither is queried independently of it.
+  warranty?: {
+    provider?: string;
+    policyNumber?: string;
+    startDate?: Date;
+    endDate?: Date;
+    coverage?: string;
+    notes?: string;
+  };
+
+  insurance?: {
+    provider?: string;
+    policyNumber?: string;
+    startDate?: Date;
+    endDate?: Date;
+    premium?: number;
+    coverageType?: string;
+    notes?: string;
+  };
+
   isDeleted: boolean;
   deletedAt?: Date;
   createdAt: Date;
@@ -143,6 +165,25 @@ const vehicleSchema = new Schema<IVehicle, IVehicleModel>({
     lastServiceOdometer: Number,
     nextServiceDueDate: Date,
     nextServiceDueOdometer: Number
+  },
+
+  warranty: {
+    provider: String,
+    policyNumber: String,
+    startDate: Date,
+    endDate: Date,
+    coverage: String,
+    notes: String
+  },
+
+  insurance: {
+    provider: String,
+    policyNumber: String,
+    startDate: Date,
+    endDate: Date,
+    premium: Number,
+    coverageType: String,
+    notes: String
   },
 
   isDeleted: { type: Boolean, default: false },

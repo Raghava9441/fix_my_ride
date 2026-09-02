@@ -8,6 +8,7 @@ import {
 } from "../services/vehicle.service";
 import { DocumentService } from "../services/document.service";
 import { ReminderService } from "../services/reminder.service";
+import { OwnerProfileService } from "../services/owner.service";
 import {
   HttpStatus,
   createSuccessResponse,
@@ -20,6 +21,9 @@ export class VehicleController {
     private readonly vehicleService: VehicleService,
     private readonly documentService: DocumentService,
     private readonly reminderService: ReminderService,
+    // Used to resolve the caller's own owner profile when a vehicle is
+    // created without an explicit owner.
+    private readonly ownerProfileService: OwnerProfileService,
   ) {}
 
   async getAllVehicles(req: Request, res: Response) {
@@ -120,9 +124,20 @@ export class VehicleController {
   async createVehicle(req: ValidatedRequest<any>, res: Response) {
     const data = req.validated;
 
-    if (!data.currentOdometer) {
+    /*
+     * Every vehicle needs an owner. Staff creating one for a customer pass
+     * `currentOwnerId`; an owner adding their own vehicle can't know their
+     * profile id, so fall back to theirs.
+     */
+    let currentOwnerId = data.currentOwnerId;
+    if (!currentOwnerId) {
+      const owner = await this.ownerProfileService.findByAccountId(req.user!.id);
+      currentOwnerId = owner?._id?.toString();
+    }
+
+    if (!currentOwnerId) {
       const error = createErrorResponse(
-        "currentOdometer is required",
+        "currentOwnerId is required (pass it explicitly, or call this as an account with an owner profile)",
         HttpStatus.BAD_REQUEST,
       );
       return res.status(error.statusCode).json(error.toJSON());
@@ -138,10 +153,12 @@ export class VehicleController {
       fuelType: data.fuelType,
       transmission: data.transmission,
       color: data.color,
-      currentOwnerId: data.currentOwnerId,
+      currentOwnerId,
+      // A brand-new vehicle legitimately has no reading yet; zero is the
+      // honest default and beats rejecting the create over it.
       currentOdometer: {
-        value: data.currentOdometer.value,
-        unit: data.currentOdometer.unit,
+        value: data.currentOdometer?.value ?? 0,
+        unit: data.currentOdometer?.unit ?? "km",
       },
       serviceSchedule: data.serviceSchedule,
     };
@@ -490,36 +507,80 @@ export class VehicleController {
     return res.status(response.statusCode).json(response.toJSON());
   }
 
+  /*
+   * Warranty and insurance.
+   *
+   * Both are sub-documents on the vehicle rather than their own collection:
+   * there is exactly one live policy of each kind per vehicle, and neither is
+   * ever queried independently of the vehicle it belongs to.
+   *
+   * The getters return `{}` rather than 404 when no policy has been recorded.
+   * "This vehicle has no warranty on file" is a normal state, not a missing
+   * resource — 404 would make every client special-case a first-time vehicle.
+   */
+  private async loadVehicleOr404(id: string, res: Response) {
+    const vehicle = await this.vehicleService.findById(id);
+    if (!vehicle) {
+      const error = createErrorResponse("Vehicle not found", HttpStatus.NOT_FOUND);
+      res.status(error.statusCode).json(error.toJSON());
+      return null;
+    }
+    return vehicle;
+  }
+
   async getWarranty(req: Request, res: Response) {
-    const error = createErrorResponse(
-      "Not implemented — no warranty/insurance field on the Vehicle schema yet",
-      HttpStatus.NOT_IMPLEMENTED,
+    const vehicle = await this.loadVehicleOr404(req.params.id, res);
+    if (!vehicle) return;
+
+    const response = createSuccessResponse(
+      vehicle.warranty ?? {},
+      "Warranty retrieved successfully",
     );
-    return res.status(error.statusCode).json(error.toJSON());
+    return res.status(response.statusCode).json(response.toJSON());
   }
 
   async updateWarranty(req: Request, res: Response) {
-    const error = createErrorResponse(
-      "Not implemented — no warranty/insurance field on the Vehicle schema yet",
-      HttpStatus.NOT_IMPLEMENTED,
+    const vehicle = await this.loadVehicleOr404(req.params.id, res);
+    if (!vehicle) return;
+
+    // Replaces the sub-document wholesale. The client always submits the whole
+    // policy form, so a partial merge would silently keep fields the user had
+    // just cleared.
+    const updated = await this.vehicleService.update(req.params.id, {
+      warranty: req.body,
+    } as any);
+
+    const response = createSuccessResponse(
+      updated?.warranty ?? {},
+      "Warranty updated successfully",
     );
-    return res.status(error.statusCode).json(error.toJSON());
+    return res.status(response.statusCode).json(response.toJSON());
   }
 
   async getInsurance(req: Request, res: Response) {
-    const error = createErrorResponse(
-      "Not implemented — no warranty/insurance field on the Vehicle schema yet",
-      HttpStatus.NOT_IMPLEMENTED,
+    const vehicle = await this.loadVehicleOr404(req.params.id, res);
+    if (!vehicle) return;
+
+    const response = createSuccessResponse(
+      vehicle.insurance ?? {},
+      "Insurance retrieved successfully",
     );
-    return res.status(error.statusCode).json(error.toJSON());
+    return res.status(response.statusCode).json(response.toJSON());
   }
 
   async updateInsurance(req: Request, res: Response) {
-    const error = createErrorResponse(
-      "Not implemented — no warranty/insurance field on the Vehicle schema yet",
-      HttpStatus.NOT_IMPLEMENTED,
+    const vehicle = await this.loadVehicleOr404(req.params.id, res);
+    if (!vehicle) return;
+
+    const updated = await this.vehicleService.update(req.params.id, {
+      insurance: req.body,
+    } as any);
+
+    const response = createSuccessResponse(
+      updated?.insurance ?? {},
+      "Insurance updated successfully",
     );
-    return res.status(error.statusCode).json(error.toJSON());
+    return res.status(response.statusCode).json(response.toJSON());
   }
 
   async transferOwnership(req: ValidatedRequest<any>, res: Response) {
