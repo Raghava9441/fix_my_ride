@@ -1,0 +1,22 @@
+.github/workflows/ai-contribution.yml
+  s_4746e00db45e68::t_2025e7369b9dc7 6-8
+  s_4746e00db45e68::t_36f7e8de90fe33 156-159
+  s_4746e00db45e68::t_fc72c684fed171 167-168
+  s_4746e00db45e68::t_0642f652d9cc19 1-5,9-155,160-166
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "de91826411a2dafb1a0710bc18653ce90841dc36",
+  "prompts": {},
+  "sessions": {
+    "s_4746e00db45e68": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a37b9d2f-dceb-4413-97fb-d2134cb05047",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Raghava9441 <raghavendrareddybollapu556@gmail.com>"
+    }
+  }
+}
