@@ -40,6 +40,66 @@ export class ReportController {
     return res.status(error.statusCode).json(error.toJSON());
   }
 
+  /**
+   * The dashboard's single data source.
+   *
+   * Resolves scope from the caller rather than making the client say which
+   * dashboard it wants: staff get their center, owners get their own fleet.
+   * Unlike `getDashboard`, this does not 400 when the caller has no service
+   * center — an owner signing in should see their own numbers, not an error,
+   * and that gap is why the old endpoint was unusable for half the userbase.
+   */
+  async getOverview(req: Request, res: Response) {
+    const days = Math.min(Math.max(Number(req.query.days) || 30, 1), 365);
+
+    /*
+     * Admin is checked first, before the profile lookups.
+     *
+     * A platform admin account can also carry an `ownerProfileId` (the seed
+     * data does), so resolving by profile alone silently scoped an admin to
+     * whatever handful of vehicles that profile happened to own and showed
+     * them an all-zero dashboard. Role wins over profile.
+     */
+    if (req.user?.roles?.includes("admin") || req.user?.role === "admin") {
+      const result = await this.reportService.getPlatformOverview(days);
+      const response = createSuccessResponse(result, "Overview retrieved successfully");
+      return res.status(response.statusCode).json(response.toJSON());
+    }
+
+    const serviceCenterId = await this.resolveServiceCenterId(req);
+    if (serviceCenterId) {
+      const result = await this.reportService.getCenterOverview(serviceCenterId, days);
+      const response = createSuccessResponse(result, "Overview retrieved successfully");
+      return res.status(response.statusCode).json(response.toJSON());
+    }
+
+    const ownerId = await this.resolveOwnerId(req);
+    if (ownerId) {
+      const result = await this.reportService.getOwnerOverview(ownerId, days);
+      const response = createSuccessResponse(result, "Overview retrieved successfully");
+      return res.status(response.statusCode).json(response.toJSON());
+    }
+
+    // A platform admin has neither profile. Rather than fail, hand back an
+    // empty-but-valid payload so the dashboard renders its zero state instead
+    // of an error page.
+    const response = createSuccessResponse(
+      {
+        scope: "none" as const,
+        generatedAt: new Date().toISOString(),
+        period: { days, start: new Date().toISOString(), end: new Date().toISOString() },
+        kpis: null,
+        revenueTrend: [],
+        jobsByStatus: [],
+        jobsByType: [],
+        recentServiceRecords: [],
+        reminders: { upcoming: [], overdueCount: 0 },
+      },
+      "No service center or owner profile for this account",
+    );
+    return res.status(response.statusCode).json(response.toJSON());
+  }
+
   async getDashboard(req: Request, res: Response) {
     const serviceCenterId = await this.resolveServiceCenterId(req);
     if (!serviceCenterId) return this.missingCenter(res);

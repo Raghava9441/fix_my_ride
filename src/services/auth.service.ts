@@ -467,10 +467,29 @@ export const authService = {
       throw AppError.fromCode("NOT_FOUND", { message: "Account not found" });
     }
 
-    const allowed = ["preferences"];
+    /*
+     * An explicit allow-list, not a merge.
+     *
+     * `email` is deliberately absent: changing it is an identity change that
+     * has to go through verification, not a profile edit. Roles, status, and
+     * tenant are absent for the obvious reason — this endpoint is the account
+     * editing itself.
+     *
+     * `phone` was missing, which meant the profile screen had a phone field
+     * it could never save.
+     */
+    const allowed = ["phone", "preferences"];
     for (const key of Object.keys(updates)) {
       if (!allowed.includes(key)) continue;
-      (account as any)[key] = updates[key];
+
+      /*
+       * `null` means "clear this", and has to be distinguished from absent.
+       * A client can't send `undefined` — JSON.stringify drops the key
+       * entirely — so without treating null as an unset, an optional field
+       * could be set once and never removed.
+       */
+      const value = updates[key];
+      (account as any)[key] = value === null || value === "" ? undefined : value;
     }
     await account.save();
     return account;
@@ -478,12 +497,29 @@ export const authService = {
 
   // ─── MFA ──────────────────────────────────────────────────────────────────
 
-  async setupMfa(userId: string): Promise<{ secret: string; backupCodes: string[] }> {
+  async setupMfa(
+    userId: string,
+  ): Promise<{ secret: string; otpauthUrl: string; backupCodes: string[] }> {
     const account = await Account.findById(userId);
     if (!account) throw AppError.fromCode("NOT_FOUND", { message: "Account not found" });
     const { secret, backupCodes } = account.generateMfaSecret();
     await account.save();
-    return { secret, backupCodes };
+
+    /*
+     * The otpauth URI is what an authenticator app scans. Returning only the
+     * raw base32 secret forced the user to hand-type 32 characters into their
+     * phone, which is both painful and error-prone.
+     *
+     * `issuer` appears as the account label in the app, so it needs to say
+     * which product this code belongs to.
+     */
+    const issuer = "Fix My Ride";
+    const label = `${issuer}:${account.email}`;
+    const otpauthUrl =
+      `otpauth://totp/${encodeURIComponent(label)}` +
+      `?secret=${secret}&issuer=${encodeURIComponent(issuer)}&algorithm=SHA1&digits=6&period=30`;
+
+    return { secret, otpauthUrl, backupCodes };
   },
 
   async enableMfa(input: { userId: string; code: string }): Promise<void> {

@@ -12,17 +12,27 @@ import {
   UpdateServiceRecordSchema,
   AddPartSchema,
   UpdatePartSchema,
+  AddLaborSchema,
+  UpdateLaborSchema,
+  AddFeedbackSchema,
+  GenerateInvoiceSchema,
   UpdateStatusSchema,
   SetNextServiceSchema,
 } from "../dto/service-record.dto";
 import { IdParamSchema } from "../dto/account.dto";
 import { ServiceRecordController } from "../controllers/serviceRecord.controller";
 import { serviceRecordService } from "../services/serviceRecord.service";
+import { invoiceService } from "../services/invoice.service";
+import { vehicleService } from "../services/vehicle.service";
+import { staffProfileService } from "../services/staff.service";
 
 const router = Router();
 
 const serviceRecordController = new ServiceRecordController(
   serviceRecordService,
+  invoiceService,
+  vehicleService,
+  staffProfileService,
 );
 
 const IdAndPartIdParamSchema = z.object({
@@ -122,8 +132,31 @@ router.get(
 router.post(
   "/:id/labor",
   validateParams(IdParamSchema),
+  validate(AddLaborSchema),
   asyncHandler(async (req: ValidatedRequest<any>, res: Response) => {
     await serviceRecordController.addLabor(req, res);
+  }),
+);
+
+const IdAndLaborIdParamSchema = z.object({
+  id: IdParamSchema.shape.id,
+  laborId: IdParamSchema.shape.id,
+});
+
+router.put(
+  "/:id/labor/:laborId",
+  validateParams(IdAndLaborIdParamSchema),
+  validate(UpdateLaborSchema),
+  asyncHandler(async (req: ValidatedRequest<any>, res: Response) => {
+    await serviceRecordController.updateLabor(req, res);
+  }),
+);
+
+router.delete(
+  "/:id/labor/:laborId",
+  validateParams(IdAndLaborIdParamSchema),
+  asyncHandler(async (req: ValidatedRequest<any>, res: Response) => {
+    await serviceRecordController.removeLabor(req, res);
   }),
 );
 
@@ -162,6 +195,7 @@ router.get(
 router.post(
   "/:id/invoice/generate",
   validateParams(IdParamSchema),
+  validate(GenerateInvoiceSchema),
   asyncHandler(async (req: ValidatedRequest<any>, res: Response) => {
     await serviceRecordController.generateInvoice(req, res);
   }),
@@ -187,6 +221,7 @@ router.patch(
 router.post(
   "/:id/feedback",
   validateParams(IdParamSchema),
+  validate(AddFeedbackSchema),
   asyncHandler(async (req: ValidatedRequest<any>, res: Response) => {
     await serviceRecordController.addFeedback(req, res);
   }),

@@ -22,7 +22,16 @@ export const CreateVehicleSchema = z.object({
   fuelType: z.enum(["petrol", "diesel", "electric", "hybrid", "cng", "lpg"]),
   transmission: z.enum(["manual", "automatic", "cvt"]).default("manual"),
   color: z.string().optional(),
-  currentOwnerId: ObjectIdSchema,
+  /*
+   * Optional on the wire, resolved in the controller.
+   *
+   * An owner adding their own vehicle has no way to know their own profile id,
+   * and requiring it here made every such request fail validation with no
+   * field to point at. Staff creating a vehicle for a customer still pass it
+   * explicitly; the controller falls back to the caller's own profile and
+   * rejects clearly if neither is available.
+   */
+  currentOwnerId: ObjectIdSchema.optional(),
   ownershipHistory: z
     .array(
       z.object({
