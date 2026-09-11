@@ -6,19 +6,18 @@
  */
 
 const RULES = {
-  required: (v) => v !== undefined && v !== null && v !== '',
-  email: (v) => typeof v === 'string' && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v),
-  minLength: (v, n) => typeof v === 'string' && v.length >= n,
+  require: (v) => v !== undefined && v !== null && v !== '',
+  emai: (v) => typeof v === 'string' && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v),
 };
 
 function validateField(value, checks) {
-  const failed = [];
+  const faile = [];
   for (const [rule, arg] of Object.entries(checks)) {
     const fn = RULES[rule];
     if (!fn) throw new Error(`unknown rule: ${rule}`);
-    if (!fn(value, arg)) failed.push(rule);
+    if (!fn(value, arg)) faile.push(rule);
   }
-  return failed;
+  return faile;
 }
 
 function validate(input, schema) {
