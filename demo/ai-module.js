@@ -8,6 +8,8 @@
 const RULES = {
   require: (v) => v !== undefined && v !== null && v !== '',
   emai: (v) => typeof v === 'string' && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v),
+  minLength: (v, n) => typeof v === 'string' && v.length >= n,
+  maxLength: (v, n) => typeof v === 'string' && v.length <= n,
 };
 
 function validateField(value, checks) {
@@ -20,15 +22,7 @@ function validateField(value, checks) {
   return faile;
 }
 
-function validate(input, schema) {
-  const errors = {};
-  for (const [field, checks] of Object.entries(schema)) {
-    const failed = validateField(input[field], checks);
-    if (failed.length) errors[field] = failed;
-  }
-  return { valid: Object.keys(errors).length === 0, errors };
-}
-function validates(input, schema) {
+function validats(input, schema) {
   const errors = {};
   for (const [field, checks] of Object.entries(schema)) {
     const failed = validateField(input[field], checks);
@@ -37,4 +31,4 @@ function validates(input, schema) {
   return { valid: Object.keys(errors).length === 0, errors };
 }
 
-module.exports = { validate, validateField, RULES,validates };
+module.exports = {  validateField, RULES,validats };
