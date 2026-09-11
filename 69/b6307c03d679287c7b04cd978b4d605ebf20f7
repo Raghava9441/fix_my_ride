@@ -1,0 +1,31 @@
+.claude/launch.json
+  s_085cbb9383f6cd::t_8d6d7f9f4df744 7-12
+src/app.ts
+  s_8c65d5393978fb::t_c34eb40188d881 117-125
+src/routes/webhook.routes.ts
+  s_8c65d5393978fb::t_07df1c7e873f16 5,23-33
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "69b6307c03d679287c7b04cd978b4d605ebf20f7",
+  "prompts": {},
+  "sessions": {
+    "s_085cbb9383f6cd": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "aeeed6f6-ef12-4cad-83a9-753b0425bec4",
+        "model": "unknown"
+      },
+      "human_author": "Raghava9441 <raghavendrareddybollapu556@gmail.com>"
+    },
+    "s_8c65d5393978fb": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "0627ec17-92a2-4aa4-9aee-78f4b3cf7ebf",
+        "model": "unknown"
+      },
+      "human_author": "Raghava9441 <raghavendrareddybollapu556@gmail.com>"
+    }
+  }
+}
