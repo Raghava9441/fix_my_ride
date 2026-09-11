@@ -1,0 +1,14 @@
+demo/human-module.js
+  h_3594bdeeba2d56 1-27
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "a4d51196b51b52a6a9ccc80480c9d0be54127cda",
+  "prompts": {},
+  "humans": {
+    "h_3594bdeeba2d56": {
+      "author": "Raghava9441 <raghavendrareddybollapu556@gmail.com>"
+    }
+  }
+}
