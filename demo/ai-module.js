@@ -10,6 +10,8 @@ const RULES = {
   emai: (v) => typeof v === 'string' && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v),
   minLength: (v, n) => typeof v === 'string' && v.length >= n,
   maxLength: (v, n) => typeof v === 'string' && v.length <= n,
+  pattern: (v, re) => typeof v === 'string' && re.test(v),
+  oneOf: (v, allowed) => Array.isArray(allowed) && allowed.includes(v),
 };
 
 function validateField(value, checks) {
