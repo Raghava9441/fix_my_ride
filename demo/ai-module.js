@@ -28,5 +28,13 @@ function validate(input, schema) {
   }
   return { valid: Object.keys(errors).length === 0, errors };
 }
+function validates(input, schema) {
+  const errors = {};
+  for (const [field, checks] of Object.entries(schema)) {
+    const failed = validateField(input[field], checks);
+    if (failed.length) errors[field] = failed;
+  }
+  return { valid: Object.keys(errors).length === 0, errors };
+}
 
-module.exports = { validate, validateField, RULES };
+module.exports = { validate, validateField, RULES,validates };
