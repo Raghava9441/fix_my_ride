@@ -70,10 +70,16 @@ jobs:
           set -uo pipefail
           echo "Scoring PR #$PR"
 
+          # GitHub runs `run:` blocks under `bash -e`, so any non-zero exit
+          # kills the step immediately. Exit 3 is informational here, not a
+          # failure, so -e has to come off around the call. `set -uo pipefail`
+          # alone does NOT disable it.
+          set +e
           # The script fetches refs/notes/ai and the PR head itself, so no
           # separate fetch step is needed here.
           node scripts/ai-percentage.js --pr "$PR" --github-output --out report.json
           CODE=$?
+          set -e
 
           echo "exit_code=$CODE" >> "$GITHUB_OUTPUT"
 
