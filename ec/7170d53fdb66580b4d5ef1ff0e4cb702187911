@@ -1,0 +1,14 @@
+demo/other.txt
+  h_3594bdeeba2d56 2
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "ec7170d53fdb66580b4d5ef1ff0e4cb702187911",
+  "prompts": {},
+  "humans": {
+    "h_3594bdeeba2d56": {
+      "author": "Raghava9441 <raghavendrareddybollapu556@gmail.com>"
+    }
+  }
+}
