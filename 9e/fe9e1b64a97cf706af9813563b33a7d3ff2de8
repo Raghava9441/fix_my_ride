@@ -1,0 +1,14 @@
+demo/ai-part.js
+  h_3594bdeeba2d56 22-35
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "9efe9e1b64a97cf706af9813563b33a7d3ff2de8",
+  "prompts": {},
+  "humans": {
+    "h_3594bdeeba2d56": {
+      "author": "Raghava9441 <raghavendrareddybollapu556@gmail.com>"
+    }
+  }
+}
