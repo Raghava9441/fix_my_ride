@@ -114,8 +114,15 @@ app.use(
   }),
 );
 
-// CORS configuration
-app.use(cors(corsOptions));
+// CORS configuration.
+// Skipped on Catalyst AppSail (X_ZOHO_CATALYST_LISTEN_PORT is only set
+// there): Catalyst's own edge gateway now handles CORS for whitelisted
+// origins (see console: Cloud Scale > Authentication > Authorized Domains).
+// Running this middleware too duplicates Access-Control-Allow-Origin /
+// -Credentials on every response, which browsers reject outright.
+if (!process.env.X_ZOHO_CATALYST_LISTEN_PORT) {
+  app.use(cors(corsOptions));
+}
 
 // Rate limiting
 app.use("/api", expressRateLimit(rateLimitConfig));
