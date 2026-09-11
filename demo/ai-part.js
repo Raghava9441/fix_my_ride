@@ -19,4 +19,18 @@ function average(values) {
   return sum(values) / values.length;
 }
 
+
+function describe(label, values) {
+  return {
+    label,
+    count: values.length,
+    total: sum(values),
+    mean: Number(average(values).toFixed(2)),
+  };
+}
+
+function format(report) {
+  return `${report.label}: ${report.count} values, total ${report.total}, mean ${report.mean}`;
+}
+
 module.exports = { add, sum, average };
