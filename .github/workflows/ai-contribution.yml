@@ -1,16 +1,20 @@
 name: AI contribution
 
-# Computes what share of a merged pull request was written by an AI agent,
-# using the line-level attribution Git AI stores in refs/notes/ai.
+# Reports what share of a merged pull request an AI agent wrote, using the
+# line-level attribution Git AI stores in refs/notes/ai.
 #
-# This only reports: it logs the split, writes it to the run summary, and
-# uploads the raw JSON. Pushing the number to Jira comes later and needs no
-# change here, since the percentage is already a step output.
+# The calculation lives in scripts/ai-percentage.js, so the number CI publishes
+# is produced by the same code you can run locally:
+#     node scripts/ai-percentage.js --pr 2
+#
+# Today this only reports. The percentage is exposed as a step output, so a
+# later Jira step can read steps.calc.outputs.ai_pct without touching anything
+# above it.
 
 on:
   pull_request:
     types: [closed]
-  # Lets you re-run the calculation for any PR without closing it again.
+  # Re-score any PR by number without having to merge something.
   workflow_dispatch:
     inputs:
       pr:
@@ -18,11 +22,11 @@ on:
         required: true
 
 permissions:
-  contents: write        # git ai ci github run pushes repaired notes back
+  contents: write   # git ai ci github run pushes repaired notes back
 
 jobs:
   ai-percentage:
-    # Only merged PRs. A closed-without-merging PR has nothing to report.
+    # Skip PRs that were closed without merging; there is nothing to report.
     if: github.event_name == 'workflow_dispatch' || github.event.pull_request.merged == true
     runs-on: ubuntu-latest
 
@@ -33,49 +37,22 @@ jobs:
           # clone does not contain.
           fetch-depth: 0
 
-      - name: Resolve the PR range
-        id: pr
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PR_NUMBER: ${{ github.event.pull_request.number || github.event.inputs.pr }}
-        run: |
-          set -euo pipefail
-          gh pr view "$PR_NUMBER" --json baseRefName,baseRefOid,headRefOid,mergeCommit,title > pr.json
-          {
-            echo "number=$PR_NUMBER"
-            echo "base=$(jq -r '.baseRefOid' pr.json)"
-            echo "head=$(jq -r '.headRefOid' pr.json)"
-            echo "merge=$(jq -r '.mergeCommit.oid // empty' pr.json)"
-            echo "title=$(jq -r '.title' pr.json)"
-          } >> "$GITHUB_OUTPUT"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
 
       - name: Install Git AI
         run: |
           set -euo pipefail
           curl -fsSL https://usegitai.com/install.sh | bash
-          # The installer edits shell profiles, which later steps never source.
+          # The installer edits shell profiles that later steps never source,
+          # so put the binary on PATH explicitly.
           echo "$HOME/.git-ai/bin" >> "$GITHUB_PATH"
-
-      - name: Fetch attribution notes and PR commits
-        run: |
-          set -euo pipefail
-          # refs/notes/ai is not in the default fetch refspec. Without this the
-          # run reports every line as unattributed and the percentage is wrong.
-          git fetch --force origin "+refs/notes/ai:refs/notes/ai" || true
-          # The PR head survives a squash merge as refs/pull/N/head, so the
-          # original commits stay reachable even though main no longer has them.
-          git fetch --force origin "pull/${{ steps.pr.outputs.number }}/head" || true
-
-          if git rev-parse --verify --quiet refs/notes/ai >/dev/null; then
-            echo "notes ref present"
-          else
-            echo "::warning::refs/notes/ai not found on origin. No developer has pushed attribution yet."
-          fi
 
       - name: Repair attribution across the merge
         # GitHub rewrites commits on squash and rebase merges, which breaks the
-        # line mapping. This rebuilds it. Non-fatal: the range measured below
-        # uses the original PR commits, which are unaffected either way.
+        # line mapping. This rebuilds it. Non-fatal, because the script scores
+        # the original PR commits, which are unaffected either way.
         if: github.event_name == 'pull_request'
         continue-on-error: true
         env:
@@ -85,84 +62,71 @@ jobs:
       - name: Calculate the AI percentage
         id: calc
         env:
-          BASE: ${{ steps.pr.outputs.base }}
-          HEAD: ${{ steps.pr.outputs.head }}
+          # Used by the script for the PR lookup; avoids anonymous rate limits
+          # and works on private repos.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR: ${{ github.event.pull_request.number || github.event.inputs.pr }}
         run: |
-          set -euo pipefail
-          echo "Measuring $BASE..$HEAD"
-          git ai stats "$BASE..$HEAD" --json > stats.json
-          cat stats.json | jq .
+          set -uo pipefail
+          echo "Scoring PR #$PR"
 
-          AI=$(jq -r '.range_stats.ai_additions' stats.json)
-          HUMAN=$(jq -r '.range_stats.human_additions' stats.json)
-          UNKNOWN=$(jq -r '.range_stats.unknown_additions' stats.json)
-          ADDED=$(jq -r '.range_stats.git_diff_added_lines' stats.json)
-          DELETED=$(jq -r '.range_stats.git_diff_deleted_lines' stats.json)
-          TOTAL_C=$(jq -r '.authorship_stats.total_commits' stats.json)
-          WITH_C=$(jq -r '.authorship_stats.commits_with_authorship' stats.json)
-          MISSING=$(jq -r '.authorship_stats.commits_without_authorship | length' stats.json)
+          # The script fetches refs/notes/ai and the PR head itself, so no
+          # separate fetch step is needed here.
+          node scripts/ai-percentage.js --pr "$PR" --github-output --out report.json
+          CODE=$?
 
-          # Percentages are taken against every added line, not against
-          # ai+human. Dividing by ai+human silently drops the unknown bucket
-          # and inflates the AI figure on any repo with untracked commits.
-          pct () { awk -v n="$1" -v d="$2" 'BEGIN { if (d == 0) print "0.0"; else printf "%.1f", (n/d)*100 }'; }
-          AI_PCT=$(pct "$AI" "$ADDED")
-          HUMAN_PCT=$(pct "$HUMAN" "$ADDED")
-          UNKNOWN_PCT=$(pct "$UNKNOWN" "$ADDED")
+          echo "exit_code=$CODE" >> "$GITHUB_OUTPUT"
 
-          {
-            echo "ai=$AI";              echo "human=$HUMAN"
-            echo "unknown=$UNKNOWN";    echo "added=$ADDED"
-            echo "ai_pct=$AI_PCT";      echo "human_pct=$HUMAN_PCT"
-            echo "unknown_pct=$UNKNOWN_PCT"
-            echo "missing_commits=$MISSING"
-          } >> "$GITHUB_OUTPUT"
-
-          echo ""
-          echo "=================== AI CONTRIBUTION ==================="
-          printf '  PR #%s  %s\n' "${{ steps.pr.outputs.number }}" "${{ steps.pr.outputs.title }}"
-          printf '  range   %s..%s\n' "$BASE" "$HEAD"
-          echo "  -----------------------------------------------------"
-          printf '  AI        %8s lines   %5s%%\n' "$AI" "$AI_PCT"
-          printf '  Human     %8s lines   %5s%%\n' "$HUMAN" "$HUMAN_PCT"
-          printf '  Unknown   %8s lines   %5s%%\n' "$UNKNOWN" "$UNKNOWN_PCT"
-          echo "  -----------------------------------------------------"
-          printf '  Added %s / deleted %s across %s commit(s)\n' "$ADDED" "$DELETED" "$TOTAL_C"
-          printf '  Commits carrying attribution: %s of %s\n' "$WITH_C" "$TOTAL_C"
-          echo "======================================================="
-          echo ""
-
-          if [ "$MISSING" -gt 0 ]; then
-            echo "::warning::$MISSING commit(s) in this PR carry no attribution, so $UNKNOWN line(s) are unknown rather than human. Those authors need Git AI installed."
-            jq -r '.authorship_stats.commits_without_authorship_with_authors[] | "  unattributed: \(.[0][0:8])  \(.[1])"' stats.json
+          # Exit 3 means some commits carried no attribution. The run should
+          # still surface the numbers, but the percentage understates AI and
+          # must not be treated as publishable.
+          if [ "$CODE" -eq 3 ]; then
+            echo "::warning::Some commits in this PR have no Git AI attribution. The percentage understates AI usage and should not be published."
+          elif [ "$CODE" -ne 0 ]; then
+            echo "::error::ai-percentage.js failed with exit code $CODE"
+            exit "$CODE"
           fi
 
-          # Same table in the run summary, so it is readable without opening logs.
-          {
-            echo "## AI contribution - PR #${{ steps.pr.outputs.number }}"
-            echo ""
-            echo "**${AI_PCT}% AI-written** (${AI} of ${ADDED} added lines)"
-            echo ""
-            echo "| Bucket | Lines | Share |"
-            echo "|---|---:|---:|"
-            echo "| AI | ${AI} | ${AI_PCT}% |"
-            echo "| Human | ${HUMAN} | ${HUMAN_PCT}% |"
-            echo "| Unknown | ${UNKNOWN} | ${UNKNOWN_PCT}% |"
-            echo ""
-            echo "Attribution present on ${WITH_C} of ${TOTAL_C} commits."
-          } >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Per-model breakdown
+      - name: Write the run summary
+        if: always() && hashFiles('report.json') != ''
         run: |
-          jq -r '.range_stats.tool_model_breakdown
-                 | to_entries[]
-                 | "  \(.key) -> \(.value.ai_additions) added, \(.value.ai_accepted) surviving"' stats.json
+          set -euo pipefail
+          node -e '
+            const r = require("./report.json");
+            const s = r.result;
+            const trusted = s.unattributed.length === 0;
+            const out = [
+              `## AI contribution - ${r.label}`,
+              "",
+              `**${s.aiPct}% AI-written** (${s.ai} of ${s.added} added lines)`,
+              "",
+              "| Bucket | Lines | Share |",
+              "|---|---:|---:|",
+              `| AI | ${s.ai} | ${s.aiPct}% |`,
+              `| Human | ${s.human} | ${s.humanPct}% |`,
+              `| Unknown | ${s.unknown} | ${s.unknownPct}% |`,
+              "",
+              `Attribution present on ${s.commitsAttributed} of ${s.commits} commits.`,
+            ];
+            if (!trusted) {
+              out.push("", `> **Not publishable.** ${s.unattributed.length} commit(s) carry no attribution, so ${s.unknown} line(s) are unknown rather than human.`);
+            }
+            for (const [model, v] of Object.entries(s.byModel)) {
+              out.push("", `\`${model}\` produced ${v.ai_additions} lines, ${v.ai_accepted} still present.`);
+            }
+            require("fs").appendFileSync(process.env.GITHUB_STEP_SUMMARY, out.join("\n") + "\n");
+          '
+
+      - name: Echo the outputs a later Jira step would consume
+        run: |
+          echo "ai_pct          = ${{ steps.calc.outputs.ai_pct }}"
+          echo "human_pct       = ${{ steps.calc.outputs.human_pct }}"
+          echo "unknown_pct     = ${{ steps.calc.outputs.unknown_pct }}"
+          echo "added           = ${{ steps.calc.outputs.added }}"
+          echo "missing_commits = ${{ steps.calc.outputs.missing_commits }}"
 
       - uses: actions/upload-artifact@v4
-        if: always()
+        if: always() && hashFiles('report.json') != ''
         with:
-          name: ai-contribution-pr-${{ steps.pr.outputs.number }}
-          path: stats.json
-
-      # The percentage is exposed as a step output, so a later Jira step can
-      # read ${{ steps.calc.outputs.ai_pct }} without reworking anything above.
+          name: ai-contribution-pr-${{ github.event.pull_request.number || github.event.inputs.pr }}
+          path: report.json
