@@ -1,0 +1,28 @@
+demo/ai-module.js
+  s_4746e00db45e68::t_5f80d459379a2c 11-12
+  h_3594bdeeba2d56 25,34
+demo/human-module.js
+  s_4746e00db45e68::t_793249d278a641 27-28,31
+  h_3594bdeeba2d56 26
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "f9d166f82651b45ff5a146ec195e2739481aa844",
+  "prompts": {},
+  "humans": {
+    "h_3594bdeeba2d56": {
+      "author": "Raghava9441 <raghavendrareddybollapu556@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_4746e00db45e68": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a37b9d2f-dceb-4413-97fb-d2134cb05047",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Raghava9441 <raghavendrareddybollapu556@gmail.com>"
+    }
+  }
+}
