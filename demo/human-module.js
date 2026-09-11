@@ -23,10 +23,9 @@ function describeErrors(result) {
     return `${field} is invalid (${rules.join(", ")})`;
   });
 }
-function describeError(result) {
-  return Object.entries(result.errors).map(([field, rules]) => {
-    return `${field} is invalid (${rules.join(", ")})`;
-  });
+
+function summarize(result) {
+  return result.valid ? "ok" : describeErrors(result).join("; ");
 }
 
-module.exports = { checkUser, describeErrors, USER_SCHEMA,describeError };
+module.exports = { checkUser, describeErrors, summarize, USER_SCHEMA };
