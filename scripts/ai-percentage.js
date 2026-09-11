@@ -153,6 +153,23 @@ function normalize(raw) {
   };
 }
 
+/**
+ * Where a pull request's range should start.
+ *
+ * Not pr.base.sha. That is the base branch's CURRENT tip, which moves every
+ * time another PR merges, and once it moves it is no longer in this branch's
+ * history. git ai stats then fails with "not reachable from refname ...".
+ *
+ * The merge base is what GitHub itself diffs against, it is always an ancestor
+ * of the head, and it excludes work that landed on the base branch meanwhile.
+ */
+function prRangeStart(pr) {
+  // Both endpoints have to exist locally for merge-base to resolve.
+  gitQuiet(["fetch", "--force", "--quiet", "origin", pr.base.ref]);
+  const mb = gitQuiet(["merge-base", pr.base.sha, pr.head.sha]);
+  return mb ? mb.trim() : pr.base.sha;
+}
+
 function rangeHead(spec) {
   const m = spec.match(/\.\.\.?(.+)$/);
   return (m ? m[1] : spec).trim();
@@ -287,7 +304,7 @@ async function main() {
     if (!opts.noFetch) fetchAttribution(opts.prs);
     for (const n of opts.prs) {
       const pr = await fetchPr(repo, n);
-      const spec = `${pr.base.sha}..${pr.head.sha}`;
+      const spec = `${prRangeStart(pr)}..${pr.head.sha}`;
       entries.push({
         label: `PR #${pr.number}  ${pr.title}`,
         spec,
