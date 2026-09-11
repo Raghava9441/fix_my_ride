@@ -1,0 +1,25 @@
+.github/workflows/ai-contribution.yml
+  s_4746e00db45e68::t_8d265c37e0069a 3-4,6-12,17,25,29,40-42,48-49,54-55,65-68,70-87,90-91,93-126,129,131-132
+scripts/ai-percentage.js
+  s_4746e00db45e68::t_7a5be980e8b9f1 80
+  s_4746e00db45e68::t_1151014c60c32b 308-309,311,315-318
+  s_4746e00db45e68::t_b03d39e4fe2cb5 267
+  s_4746e00db45e68::t_cb143ad04a6020 1-79,81-155,179,201-266,268-307,310,312-314,319-331
+  s_4746e00db45e68::t_eb947d5dc196ff 156-178,180-200
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "b361d9bd594a2cc2be62e6a398097e02d3814ff7",
+  "prompts": {},
+  "sessions": {
+    "s_4746e00db45e68": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a37b9d2f-dceb-4413-97fb-d2134cb05047",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Raghava9441 <raghavendrareddybollapu556@gmail.com>"
+    }
+  }
+}
