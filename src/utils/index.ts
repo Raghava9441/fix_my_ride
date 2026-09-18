@@ -13,6 +13,7 @@ export * from "./password";
 export * from "./token";
 export * from "./encryption";
 export * from "./pagination";
+export * from "./totp";
 
 // Re-export commonly used items at top level
 export {
@@ -119,3 +120,8 @@ export {
   cursorPagination,
   buildPaginationLinks,
 } from "./pagination";
+
+export {
+  base32Encode,
+  buildOtpauthUrl,
+} from "./totp";

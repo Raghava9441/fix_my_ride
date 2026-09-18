@@ -6,6 +6,7 @@ import { seedSubscriptionPlans } from "./subscription.seed";
 import { seedAdmin } from "./admin.seed";
 import { seedServiceCenter } from "./service-center.seed";
 import { seedSampleData } from "./sample-data.seed";
+import { seedOperationalData } from "./operational-data.seed";
 
 interface SeedContext {
   tenantId?: mongoose.Types.ObjectId;
@@ -60,6 +61,9 @@ export const seedAll = async (): Promise<void> => {
 
     // Step 4: Seed sample data (optional)
     await seedSampleData(tenantId);
+
+    // Step 5: Seed the operational collections that depend on step 4
+    await seedOperationalData(tenantId);
 
     const duration = ((Date.now() - startTime) / 1000).toFixed(2);
     console.log("\n" + "=".repeat(50));
@@ -116,6 +120,7 @@ export const seedDevelopment = async (): Promise<void> => {
     if (adminAccount?.tenantId) {
       await seedServiceCenter(adminAccount.tenantId);
       await seedSampleData(adminAccount.tenantId);
+      await seedOperationalData(adminAccount.tenantId);
     }
 
     console.log("\n✅ Development seeding completed\n");

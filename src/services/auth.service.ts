@@ -18,6 +18,7 @@ import {
   generateRefreshToken,
   invalidateToken,
 } from "../utils/token";
+import { buildOtpauthUrl } from "../utils/totp";
 import { logger } from "../config/logger";
 
 export interface TokenPair {
@@ -478,12 +479,30 @@ export const authService = {
 
   // ─── MFA ──────────────────────────────────────────────────────────────────
 
-  async setupMfa(userId: string): Promise<{ secret: string; backupCodes: string[] }> {
+  /**
+   * Begins an enrolment. Does **not** enable MFA — `enableMfa` does that,
+   * once the user has proved the app is working by returning a valid code.
+   *
+   * Returns the `otpauth://` URI as well as the raw secret. The URI is what
+   * a QR code is rendered from; the secret is the manual-entry fallback for
+   * anyone who can't scan one. Both describe the same enrolment, in the two
+   * encodings involved — see utils/totp.ts for why they differ.
+   */
+  async setupMfa(
+    userId: string,
+  ): Promise<{ secret: string; otpauthUrl: string; backupCodes: string[] }> {
     const account = await Account.findById(userId);
     if (!account) throw AppError.fromCode("NOT_FOUND", { message: "Account not found" });
     const { secret, backupCodes } = account.generateMfaSecret();
     await account.save();
-    return { secret, backupCodes };
+
+    const otpauthUrl = buildOtpauthUrl({
+      secretHex: secret,
+      accountName: account.email,
+      issuer: config.appName,
+    });
+
+    return { secret, otpauthUrl, backupCodes };
   },
 
   async enableMfa(input: { userId: string; code: string }): Promise<void> {
@@ -520,10 +539,29 @@ export const authService = {
     await account.save();
   },
 
+  /**
+   * Issues a fresh set of recovery codes, invalidating the previous set.
+   *
+   * Uses `generateBackupCodes`, not `generateMfaSecret`: the latter also
+   * rotates the TOTP secret, which would break the caller's authenticator
+   * app as a side effect of asking for new recovery codes.
+   *
+   * Requires MFA to be enabled. Handing out recovery codes for an enrolment
+   * that was never completed produces codes that look usable and aren't.
+   */
   async generateBackupCodes(userId: string): Promise<string[]> {
     const account = await Account.findById(userId);
     if (!account) throw AppError.fromCode("NOT_FOUND", { message: "Account not found" });
-    const { backupCodes } = account.generateMfaSecret();
+    if (!account.mfaEnabled) {
+      // CONFLICT (409), not MFA_INVALID (401). A 401 here would read as an
+      // expired access token on the client and set the refresh flow going
+      // for what is really a precondition failure: the request is
+      // authenticated, the account just isn't enrolled yet.
+      throw AppError.fromCode("CONFLICT", {
+        message: "Enable two-factor authentication before generating backup codes",
+      });
+    }
+    const backupCodes = account.generateBackupCodes();
     await account.save();
     return backupCodes;
   },

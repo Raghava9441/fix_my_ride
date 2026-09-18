@@ -56,6 +56,7 @@ export interface IAccount extends Document {
   generateEmailVerificationToken(): string;
   generatePasswordResetToken(): string;
   generateMfaSecret(): { secret: string; backupCodes: string[] };
+  generateBackupCodes(): string[];
   softDelete(): Promise<IAccount>;
 }
 
@@ -319,17 +320,38 @@ accountSchema.methods.generatePasswordResetToken = function(): string {
   return token;
 };
 
-accountSchema.methods.generateMfaSecret = function(): { secret: string; backupCodes: string[] } {
-  const secret = crypto.randomBytes(20).toString('hex');
-  this.mfaSecret = secret;
+/**
+ * Replaces the recovery codes, leaving the TOTP secret alone.
+ *
+ * Split out from `generateMfaSecret` deliberately. Regenerating backup codes
+ * used to go through that method, which rotates `mfaSecret` as well — so
+ * asking for fresh recovery codes silently invalidated the user's
+ * authenticator enrolment, and the next code their app produced was
+ * rejected with no explanation and no way back in.
+ */
+accountSchema.methods.generateBackupCodes = function(): string[] {
   this.mfaBackupCodes = Array(10).fill(null).map(() => ({
     code: crypto.randomBytes(4).toString('hex').toUpperCase(),
     used: false
   }));
-  return {
-    secret,
-    backupCodes: this.mfaBackupCodes.map((c: { code: string }) => c.code)
-  };
+  return this.mfaBackupCodes.map((c: { code: string }) => c.code);
+};
+
+/**
+ * Starts a fresh enrolment: a new secret *and* a new set of recovery codes.
+ *
+ * Both rotate together on purpose — recovery codes are an alternative proof
+ * of the same secret, so carrying the old ones over to a new secret would
+ * leave valid codes for an enrolment that no longer exists.
+ *
+ * The secret is hex-encoded because `verifyTotp` reads it back with
+ * `Buffer.from(secret, "hex")`. Authenticator apps need base32 instead —
+ * `buildOtpauthUrl` in utils/totp.ts does that conversion at the edge.
+ */
+accountSchema.methods.generateMfaSecret = function(): { secret: string; backupCodes: string[] } {
+  const secret = crypto.randomBytes(20).toString('hex');
+  this.mfaSecret = secret;
+  return { secret, backupCodes: this.generateBackupCodes() };
 };
 
 accountSchema.methods.softDelete = async function(): Promise<IAccount> {

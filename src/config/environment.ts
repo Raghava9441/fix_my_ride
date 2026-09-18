@@ -29,6 +29,7 @@ export const config = {
     : env.PORT,
   host: env.HOST,
   appUrl: env.APP_URL ?? `http://localhost:${env.PORT}`,
+  appName: env.APP_NAME,
 
   db: {
     uri: env.MONGODB_URI,

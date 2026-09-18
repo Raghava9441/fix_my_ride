@@ -30,6 +30,13 @@ export const envSchema = z
     PORT: z.coerce.number().int().positive().default(5000),
     HOST: z.string().default("0.0.0.0"),
     APP_URL: z.string().url().optional(),
+    /**
+     * Issuer shown in authenticator apps beside a user's MFA entry, and the
+     * label their existing enrolments are keyed on. Changing it does not
+     * break code generation, but it does orphan the old entry visually — so
+     * it is configuration, not a literal.
+     */
+    APP_NAME: z.string().default("Fix My Ride"),
 
     // ─── Database (MongoDB) ─────────────────────────────────────────────
     MONGODB_URI: requiredString("MONGODB_URI is required"),
