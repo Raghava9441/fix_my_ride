@@ -173,14 +173,29 @@ export class InvitationController {
   }
 
   async updateInvitation(req: ValidatedRequest<any>, res: Response) {
-    // The service exposes only specific state transitions (accept/revoke/
-    // sendReminder) — there is no generic field-level update method to call
-    // into for arbitrary fields like `message`/`maxUses`/`expiresAt`.
-    const error = createErrorResponse(
-      "Updating invitation fields directly is not implemented",
-      HttpStatus.NOT_IMPLEMENTED,
-    );
-    return res.status(error.statusCode).json(error.toJSON());
+    const { id } = req.params;
+    const data = req.validated;
+
+    const invitation = await this.invitationService.update(id, {
+      message: data.message,
+      maxUses: data.maxUses,
+      expiresAt: data.expiresAt ? new Date(data.expiresAt) : undefined,
+    });
+
+    if (invitation === null) {
+      const error = createErrorResponse("Invitation not found", HttpStatus.NOT_FOUND);
+      return res.status(error.statusCode).json(error.toJSON());
+    }
+    if (invitation === undefined) {
+      const error = createErrorResponse(
+        "Only pending invitations can be edited",
+        HttpStatus.CONFLICT,
+      );
+      return res.status(error.statusCode).json(error.toJSON());
+    }
+
+    const response = createSuccessResponse(invitation, "Invitation updated successfully");
+    return res.status(response.statusCode).json(response.toJSON());
   }
 
   async deleteInvitation(req: Request, res: Response) {

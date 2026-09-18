@@ -66,13 +66,20 @@ registry.registerPath({
   method: "post",
   path: `${base}/export`,
   tags: TAGS,
-  summary: "Export a report as CSV (PDF/Excel not implemented — no generation library in this codebase)",
+  summary: "Export a report as CSV, Excel or PDF",
+  description: "`format` selects the renderer: `csv` (default), `excel` (.xlsx) or `pdf`. The PDF is a landscape A4 table that paginates with a repeated header row; wide reports clip cell text rather than overflowing the page.",
   security: BEARER_AUTH,
   request: { body: { content: { "application/json": { schema: ExportReportSchema } } } },
   responses: {
-    200: { description: "CSV file", content: { "text/csv": { schema: { type: "string" } } } },
+    200: {
+      description: "The rendered report, in the requested format",
+      content: {
+        "text/csv": { schema: { type: "string" } },
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": { schema: { type: "string", format: "binary" } },
+        "application/pdf": { schema: { type: "string", format: "binary" } },
+      },
+    },
     400: { description: "Unknown report type, or missing serviceCenterId/ownerId" },
-    501: { description: "format was pdf/excel — not implemented" },
     ...commonErrorResponses({ validate: true }),
   },
 });

@@ -242,11 +242,28 @@ export class OwnerController {
   }
 
   async deleteNotifications(req: Request, res: Response) {
-    const error = createErrorResponse(
-      "Bulk notification deletion is not implemented yet",
-      HttpStatus.NOT_IMPLEMENTED,
+    const { id } = req.params;
+
+    const owner = await this.ownerService.findById(id);
+    if (!owner) {
+      const error = createErrorResponse("Owner not found", HttpStatus.NOT_FOUND);
+      return res.status(error.statusCode).json(error.toJSON());
+    }
+
+    const deletedCount = await notificationService.deleteByRecipient(
+      owner.accountId.toString(),
+      "Account",
+      {
+        status: req.query.status as string | undefined,
+        readOnly: req.query.readOnly === "true",
+      },
     );
-    return res.status(error.statusCode).json(error.toJSON());
+
+    const response = createSuccessResponse(
+      { deletedCount },
+      "Notifications deleted successfully",
+    );
+    return res.status(response.statusCode).json(response.toJSON());
   }
 
   async getPreferences(req: Request, res: Response) {

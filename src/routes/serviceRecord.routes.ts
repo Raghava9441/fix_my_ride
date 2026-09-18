@@ -7,6 +7,7 @@ import {
   ValidatedRequest,
 } from "../middleware/validation.middleware";
 import { authenticate } from "../middleware/auth.middleware";
+import { uploadSingle } from "../middleware/upload.middleware";
 import {
   CreateServiceRecordSchema,
   UpdateServiceRecordSchema,
@@ -14,15 +15,26 @@ import {
   UpdatePartSchema,
   UpdateStatusSchema,
   SetNextServiceSchema,
+  GenerateInvoiceSchema,
+  AddLaborSchema,
+  AddFeedbackSchema,
 } from "../dto/service-record.dto";
+import { UploadEntityDocumentSchema } from "../dto/document.dto";
+
 import { IdParamSchema } from "../dto/account.dto";
 import { ServiceRecordController } from "../controllers/serviceRecord.controller";
 import { serviceRecordService } from "../services/serviceRecord.service";
+import { documentService } from "../services/document.service";
+import { storageService } from "../services/storage.service";
+import { invoiceService } from "../services/invoice.service";
 
 const router = Router();
 
 const serviceRecordController = new ServiceRecordController(
   serviceRecordService,
+  documentService,
+  storageService,
+  invoiceService,
 );
 
 const IdAndPartIdParamSchema = z.object({
@@ -122,6 +134,7 @@ router.get(
 router.post(
   "/:id/labor",
   validateParams(IdParamSchema),
+  validate(AddLaborSchema),
   asyncHandler(async (req: ValidatedRequest<any>, res: Response) => {
     await serviceRecordController.addLabor(req, res);
   }),
@@ -138,6 +151,8 @@ router.get(
 router.post(
   "/:id/documents",
   validateParams(IdParamSchema),
+  uploadSingle,
+  validate(UploadEntityDocumentSchema),
   asyncHandler(async (req: ValidatedRequest<any>, res: Response) => {
     await serviceRecordController.uploadDocument(req, res);
   }),
@@ -162,6 +177,7 @@ router.get(
 router.post(
   "/:id/invoice/generate",
   validateParams(IdParamSchema),
+  validate(GenerateInvoiceSchema),
   asyncHandler(async (req: ValidatedRequest<any>, res: Response) => {
     await serviceRecordController.generateInvoice(req, res);
   }),
@@ -187,6 +203,7 @@ router.patch(
 router.post(
   "/:id/feedback",
   validateParams(IdParamSchema),
+  validate(AddFeedbackSchema),
   asyncHandler(async (req: ValidatedRequest<any>, res: Response) => {
     await serviceRecordController.addFeedback(req, res);
   }),

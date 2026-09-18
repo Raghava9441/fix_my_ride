@@ -20,6 +20,7 @@ import { Notification } from "./Notification";
 import { Reminder } from "./Reminder";
 import { Invoice } from "./Invoice";
 import { Subscription } from "./Subscription";
+import { Review } from "./Review";
 
 // Export all models
 export {
@@ -42,4 +43,5 @@ export {
   Reminder,
   Invoice,
   Subscription,
+  Review,
 };

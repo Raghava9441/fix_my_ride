@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { registry } from "../registry";
-import { successEnvelope, paginatedEnvelope, commonErrorResponses, BEARER_AUTH, IdParamSchema, PaginationQuerySchema } from "../common";
+import { successEnvelope, paginatedEnvelope, commonErrorResponses, entityDocumentUploadBody, BEARER_AUTH, IdParamSchema, PaginationQuerySchema } from "../common";
 import {
   CreateServiceCenterSchema,
   UpdateServiceCenterSchema,
@@ -8,6 +8,7 @@ import {
   AddServiceSchema,
   UpdateServiceSchema,
   CreateReviewSchema,
+  VerifyCenterSchema,
 } from "../../dto/service-center.dto";
 
 const TAGS = ["Service Centers"];
@@ -69,9 +70,15 @@ registry.registerPath({
 });
 
 registry.registerPath({
-  method: "put", path: `${base}/{id}/services/{serviceId}`, tags: TAGS, summary: "Update a service offering (not implemented — service only supports add-by-name/remove-by-name)", security: BEARER_AUTH,
+  method: "put", path: `${base}/{id}/services/{serviceId}`, tags: TAGS,
+  summary: "Update one service offering in place",
+  description: "Addressed by the offering's subdocument id. Only the fields sent are changed; omitted fields keep their stored value.",
+  security: BEARER_AUTH,
   request: { params: withId({ serviceId: z.string() }), ...jsonBody(UpdateServiceSchema) },
-  responses: { 501: { description: "Not implemented" }, ...commonErrorResponses() },
+  responses: {
+    200: { description: "Service updated", content: { "application/json": { schema: successEnvelope("ServiceCenterServiceUpdatedResponse", record) } } },
+    ...commonErrorResponses({ notFound: true, validate: true }),
+  },
 });
 
 registry.registerPath({
@@ -85,28 +92,49 @@ registry.registerPath({
 });
 
 registry.registerPath({
-  method: "get", path: `${base}/{id}/reviews`, tags: TAGS, summary: "List reviews (not implemented — no Review model exists)", security: BEARER_AUTH, request: { params: IdParamSchema },
-  responses: { 501: { description: "Not implemented" }, ...commonErrorResponses() },
+  method: "get", path: `${base}/{id}/reviews`, tags: TAGS, summary: "List a service centre's customer reviews, newest first", security: BEARER_AUTH, request: { params: IdParamSchema },
+  responses: {
+    200: { description: "Reviews", content: { "application/json": { schema: successEnvelope("ServiceCenterReviewsResponse", z.array(record)) } } },
+    ...commonErrorResponses({ notFound: true }),
+  },
 });
 
 registry.registerPath({
-  method: "post", path: `${base}/{id}/reviews`, tags: TAGS, summary: "Add a review (not implemented — no Review model exists)", security: BEARER_AUTH, request: { params: IdParamSchema, ...jsonBody(CreateReviewSchema) },
-  responses: { 501: { description: "Not implemented" }, ...commonErrorResponses() },
+  method: "post", path: `${base}/{id}/reviews`, tags: TAGS,
+  summary: "Leave a review for a service centre",
+  description: "One review per account per centre — posting again edits the existing review rather than adding a second rating. The centre's cached `stats.averageRating` and `stats.totalReviews` are recomputed on every write. The reviewer is taken from the access token.",
+  security: BEARER_AUTH, request: { params: IdParamSchema, ...jsonBody(CreateReviewSchema) },
+  responses: {
+    201: { description: "Review saved", content: { "application/json": { schema: successEnvelope("ServiceCenterReviewResponse", record) } } },
+    ...commonErrorResponses({ notFound: true, validate: true }),
+  },
 });
 
 registry.registerPath({
-  method: "post", path: `${base}/{id}/verify`, tags: TAGS, summary: "Mark a center as verified (not implemented — no verified field on the schema)", security: BEARER_AUTH, request: { params: IdParamSchema },
-  responses: { 501: { description: "Not implemented" }, ...commonErrorResponses() },
+  method: "post", path: `${base}/{id}/verify`, tags: TAGS,
+  summary: "Mark a service centre as verified (admin only)",
+  description: "Records who verified the centre and when. Send `isVerified: false` to withdraw verification. Restricted to admins — verification is a trust signal shown to customers, so a centre must not be able to verify itself.",
+  security: BEARER_AUTH, request: { params: IdParamSchema, ...jsonBody(VerifyCenterSchema) },
+  responses: {
+    200: { description: "Verification updated", content: { "application/json": { schema: successEnvelope("ServiceCenterVerificationResponse", record) } } },
+    ...commonErrorResponses({ notFound: true, validate: true }),
+  },
 });
 
 registry.registerPath({
-  method: "post", path: `${base}/{id}/documents`, tags: TAGS, summary: "Upload a center document (not implemented here — use POST /api/v1/documents/upload)", security: BEARER_AUTH, request: { params: IdParamSchema },
-  responses: { 501: { description: "Not implemented" }, ...commonErrorResponses() },
+  method: "post", path: `${base}/{id}/documents`, tags: TAGS, summary: "Attach a document to a service center (multipart/form-data)", security: BEARER_AUTH,
+  request: { params: IdParamSchema, ...entityDocumentUploadBody() },
+  responses: {
+    201: { description: "Document uploaded", content: { "application/json": { schema: successEnvelope("ServiceCenterDocumentUploadResponse", record) } } },
+    400: { description: "No file uploaded, or unsupported file type" },
+    ...commonErrorResponses({ notFound: true, validate: true }),
+  },
 });
 
 registry.registerPath({
-  method: "get", path: `${base}/{id}/documents`, tags: TAGS, summary: "List center documents (not implemented here — use GET /api/v1/documents/entity/service_center/{id})", security: BEARER_AUTH, request: { params: IdParamSchema },
-  responses: { 501: { description: "Not implemented" }, ...commonErrorResponses() },
+  method: "get", path: `${base}/{id}/documents`, tags: TAGS, summary: "List documents attached to a service center", security: BEARER_AUTH,
+  request: { params: IdParamSchema, query: z.object({ type: z.string().optional() }) },
+  responses: { 200: { description: "Documents", content: { "application/json": { schema: successEnvelope("ServiceCenterDocumentsResponse", z.array(record)) } } }, ...commonErrorResponses({ notFound: true }) },
 });
 
 registry.registerPath({

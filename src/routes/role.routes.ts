@@ -10,6 +10,7 @@ import {
   CreateRoleSchema,
   UpdateRoleSchema,
   AddPermissionToRoleSchema,
+  AssignRoleToUserSchema,
 } from "../dto/role.dto";
 import { IdParamSchema } from "../dto/account.dto";
 import { authenticate } from "../middleware/auth.middleware";
@@ -101,7 +102,9 @@ router.delete(
 
 router.post(
   "/:id/assign",
+  requireRole("admin"),
   validateParams(IdParamSchema),
+  validate(AssignRoleToUserSchema),
   asyncHandler(async (req: ValidatedRequest<any>, res: Response) => {
     await roleController.assignRoleToUser(req, res);
   }),
@@ -109,6 +112,7 @@ router.post(
 
 router.delete(
   "/:id/assign/:accountId",
+  requireRole("admin"),
   validateParams(
     z.object({
       id: IdParamSchema.shape.id,

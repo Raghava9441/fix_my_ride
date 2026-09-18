@@ -5,6 +5,9 @@ import {
   CreateServiceCenterInput,
   UpdateServiceCenterInput,
 } from "../services/serviceCenter.service";
+import { DocumentService } from "../services/document.service";
+import { StorageService } from "../services/storage.service";
+import { ReviewService } from "../services/review.service";
 import {
   HttpStatus,
   createSuccessResponse,
@@ -12,8 +15,16 @@ import {
   createPaginatedResponse,
 } from "../utils";
 
+/** Value stored in `Document.entityType` for everything this controller attaches. */
+const ENTITY_TYPE = "service_center" as const;
+
 export class ServiceCenterController {
-  constructor(private readonly serviceCenterService: ServiceCenterService) {}
+  constructor(
+    private readonly serviceCenterService: ServiceCenterService,
+    private readonly documentService: DocumentService,
+    private readonly storageService: StorageService,
+    private readonly reviewService: ReviewService,
+  ) {}
 
   async getAll(req: Request, res: Response) {
     const filters = {
@@ -299,16 +310,26 @@ export class ServiceCenterController {
     }
   }
 
-  async updateService(req: Request, res: Response) {
-    // The service layer only supports adding a service by name and
-    // removing one by name (ServiceCenterService.addService/removeService);
-    // there is no method to update an existing servicesOffered entry in
-    // place, so this endpoint is not implemented.
-    const error = createErrorResponse(
-      "Updating a service entry in place is not implemented yet",
-      HttpStatus.NOT_IMPLEMENTED,
+  async updateService(req: ValidatedRequest<any>, res: Response) {
+    const { id, serviceId } = req.params;
+
+    const service = await this.serviceCenterService.updateService(
+      id,
+      serviceId,
+      req.validated,
     );
-    return res.status(error.statusCode).json(error.toJSON());
+
+    if (service === null) {
+      const error = createErrorResponse("Service center not found", HttpStatus.NOT_FOUND);
+      return res.status(error.statusCode).json(error.toJSON());
+    }
+    if (service === undefined) {
+      const error = createErrorResponse("Service not found", HttpStatus.NOT_FOUND);
+      return res.status(error.statusCode).json(error.toJSON());
+    }
+
+    const response = createSuccessResponse(service, "Service updated successfully");
+    return res.status(response.statusCode).json(response.toJSON());
   }
 
   async deleteService(req: Request, res: Response) {
@@ -371,49 +392,123 @@ export class ServiceCenterController {
   }
 
   async getCenterReviews(req: Request, res: Response) {
-    // No Review model/collection exists in this codebase — ServiceCenter
-    // only carries a single cached stats.averageRating number.
-    const error = createErrorResponse(
-      "Reviews are not implemented yet",
-      HttpStatus.NOT_IMPLEMENTED,
-    );
-    return res.status(error.statusCode).json(error.toJSON());
+    const { id } = req.params;
+
+    const center = await this.serviceCenterService.findById(id);
+    if (!center) {
+      const error = createErrorResponse("Service center not found", HttpStatus.NOT_FOUND);
+      return res.status(error.statusCode).json(error.toJSON());
+    }
+
+    const reviews = await this.reviewService.findByCenter(id);
+
+    const response = createSuccessResponse(reviews, "Reviews retrieved successfully");
+    return res.status(response.statusCode).json(response.toJSON());
   }
 
-  async addReview(req: Request, res: Response) {
-    // Same reason as getCenterReviews: no Review model/collection exists.
-    const error = createErrorResponse(
-      "Reviews are not implemented yet",
-      HttpStatus.NOT_IMPLEMENTED,
+  async addReview(req: ValidatedRequest<any>, res: Response) {
+    const { id } = req.params;
+
+    const review = await this.reviewService.upsertForCenter(id, req.user!.id, req.validated);
+    if (!review) {
+      const error = createErrorResponse("Service center not found", HttpStatus.NOT_FOUND);
+      return res.status(error.statusCode).json(error.toJSON());
+    }
+
+    const response = createSuccessResponse(
+      review,
+      "Review submitted successfully",
+      HttpStatus.CREATED,
     );
-    return res.status(error.statusCode).json(error.toJSON());
+    return res.status(response.statusCode).json(response.toJSON());
   }
 
-  async verifyCenter(req: Request, res: Response) {
-    // ServiceCenter has no "verified" field in the schema.
-    const error = createErrorResponse(
-      "Service center verification is not implemented yet",
-      HttpStatus.NOT_IMPLEMENTED,
+  async verifyCenter(req: ValidatedRequest<any>, res: Response) {
+    const { id } = req.params;
+    const { isVerified, notes } = req.validated;
+
+    const verification = await this.serviceCenterService.setVerification(
+      id,
+      isVerified,
+      req.user?.id,
+      notes,
     );
-    return res.status(error.statusCode).json(error.toJSON());
+
+    if (!verification) {
+      const error = createErrorResponse("Service center not found", HttpStatus.NOT_FOUND);
+      return res.status(error.statusCode).json(error.toJSON());
+    }
+
+    const response = createSuccessResponse(
+      verification,
+      isVerified ? "Service center verified successfully" : "Service center verification removed",
+    );
+    return res.status(response.statusCode).json(response.toJSON());
   }
 
-  async uploadDocument(req: Request, res: Response) {
-    // ServiceCenter has no documents field/model backing this endpoint.
-    const error = createErrorResponse(
-      "Document upload is not implemented yet",
-      HttpStatus.NOT_IMPLEMENTED,
+  async uploadDocument(req: ValidatedRequest<any>, res: Response) {
+    const { id } = req.params;
+    const file = req.file;
+
+    if (!file) {
+      const error = createErrorResponse("No file was uploaded", HttpStatus.BAD_REQUEST);
+      return res.status(error.statusCode).json(error.toJSON());
+    }
+
+    const center = await this.serviceCenterService.findById(id);
+    if (!center) {
+      const error = createErrorResponse("Service center not found", HttpStatus.NOT_FOUND);
+      return res.status(error.statusCode).json(error.toJSON());
+    }
+
+    const data = req.validated;
+    const stored = await this.storageService.saveFile(
+      file.buffer,
+      file.originalname,
+      file.mimetype,
+      ENTITY_TYPE,
     );
-    return res.status(error.statusCode).json(error.toJSON());
+
+    const document = await this.documentService.create({
+      accountId: data.accountId ?? req.user?.id,
+      originalName: stored.originalName,
+      fileName: stored.fileName,
+      mimeType: stored.mimeType,
+      size: stored.size,
+      extension: stored.extension,
+      storageProvider: stored.storageProvider,
+      url: stored.url,
+      path: stored.path,
+      entityType: ENTITY_TYPE,
+      entityId: id,
+      documentType: data.documentType,
+      description: data.description,
+      tags: data.tags,
+      isPublic: data.isPublic,
+      allowedRoles: data.allowedRoles,
+      allowedAccounts: data.allowedAccounts,
+      validFrom: data.validFrom ? new Date(data.validFrom) : undefined,
+      validUntil: data.validUntil ? new Date(data.validUntil) : undefined,
+      metadata: data.metadata,
+    });
+
+    const response = createSuccessResponse(
+      document,
+      "Document uploaded successfully",
+      HttpStatus.CREATED,
+    );
+    return res.status(response.statusCode).json(response.toJSON());
   }
 
   async getDocuments(req: Request, res: Response) {
-    // Same reason as uploadDocument: no documents field/model exists.
-    const error = createErrorResponse(
-      "Document listing is not implemented yet",
-      HttpStatus.NOT_IMPLEMENTED,
-    );
-    return res.status(error.statusCode).json(error.toJSON());
+    const { id } = req.params;
+
+    const documents = await this.documentService.findByEntity(ENTITY_TYPE, id, {
+      type: req.query.type as string,
+    });
+
+    const response = createSuccessResponse(documents, "Documents retrieved successfully");
+    return res.status(response.statusCode).json(response.toJSON());
   }
 
   async getSettings(req: Request, res: Response) {

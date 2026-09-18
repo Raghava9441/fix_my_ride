@@ -1,5 +1,6 @@
 import mongoose from "mongoose";
 import ExcelJS from "exceljs";
+import PDFDocument from "pdfkit";
 import { Vehicle } from "../models/Vehicle";
 import { ServiceRecord } from "../models/ServiceRecord";
 import { StaffProfile } from "../models/StaffProfile";
@@ -274,6 +275,94 @@ export class ReportService {
       lines.push(headers.map((h) => escape((row as any)[h])).join(","));
     }
     return lines.join("\n");
+  }
+
+  /**
+   * Renders rows as a paginated PDF table. Column widths are split evenly
+   * across the printable width and cell text is clipped to fit, so a wide
+   * report degrades to truncated columns rather than overflowing the page.
+   */
+  async toPdf(rows: Record<string, unknown>[], title = "Report"): Promise<Buffer> {
+    const doc = new PDFDocument({ size: "A4", layout: "landscape", margin: 36 });
+
+    const chunks: Buffer[] = [];
+    doc.on("data", (chunk: Buffer) => chunks.push(chunk));
+    const finished = new Promise<Buffer>((resolve) => {
+      doc.on("end", () => resolve(Buffer.concat(chunks)));
+    });
+
+    const left = doc.page.margins.left;
+    const right = doc.page.width - doc.page.margins.right;
+    const bottom = doc.page.height - doc.page.margins.bottom;
+    const printableWidth = right - left;
+
+    doc.fontSize(16).font("Helvetica-Bold").text(title, left, doc.page.margins.top);
+    doc
+      .fontSize(9)
+      .font("Helvetica")
+      .fillColor("#555555")
+      .text(`Generated ${new Date().toISOString().replace("T", " ").slice(0, 19)} UTC`);
+    doc.fillColor("#000000");
+    doc.moveDown(0.8);
+
+    if (rows.length === 0) {
+      doc.fontSize(11).text("No data for the selected period.");
+      doc.end();
+      return finished;
+    }
+
+    const headers = Object.keys(rows[0]);
+    const columnWidth = printableWidth / headers.length;
+    const rowHeight = 18;
+
+    const cell = (value: unknown) => {
+      if (value === null || value === undefined) return "";
+      if (value instanceof Date) return value.toISOString().slice(0, 10);
+      if (typeof value === "object") return JSON.stringify(value);
+      return String(value);
+    };
+
+    const drawRow = (values: string[], y: number, bold: boolean) => {
+      doc.font(bold ? "Helvetica-Bold" : "Helvetica").fontSize(8);
+      values.forEach((value, index) => {
+        doc.text(value, left + index * columnWidth + 3, y + 5, {
+          width: columnWidth - 6,
+          height: rowHeight - 6,
+          ellipsis: true,
+          lineBreak: false,
+        });
+      });
+    };
+
+    const drawHeader = (y: number) => {
+      doc.rect(left, y, printableWidth, rowHeight).fill("#eeeeee");
+      doc.fillColor("#000000");
+      drawRow(headers, y, true);
+      return y + rowHeight;
+    };
+
+    let y = drawHeader(doc.y);
+
+    for (const row of rows) {
+      if (y + rowHeight > bottom) {
+        doc.addPage();
+        y = drawHeader(doc.page.margins.top);
+      }
+
+      drawRow(headers.map((header) => cell(row[header])), y, false);
+
+      doc
+        .moveTo(left, y + rowHeight)
+        .lineTo(right, y + rowHeight)
+        .strokeColor("#dddddd")
+        .lineWidth(0.5)
+        .stroke();
+
+      y += rowHeight;
+    }
+
+    doc.end();
+    return finished;
   }
 
   async toExcel(rows: Record<string, unknown>[]): Promise<Buffer> {

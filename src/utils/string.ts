@@ -93,6 +93,16 @@ export function randomToken(length: number = 32): string {
 }
 
 /**
+ * Escapes regex metacharacters so user input can be embedded in a `RegExp`
+ * as a literal — needed anywhere a free-text search term reaches a Mongo
+ * `$regex` query, both to keep the pattern valid and to stop a crafted term
+ * behaving as a pattern.
+ */
+export function escapeRegExp(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
  * Strip HTML tags from string
  */
 export function stripHtml(html: string): string {

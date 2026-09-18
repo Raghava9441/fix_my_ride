@@ -119,17 +119,40 @@ export const TransferOwnershipSchema = z.object({
   transferReason: z.string().optional(),
 });
 
+/**
+ * PUT semantics: the whole warranty block is replaced by what's sent, so an
+ * omitted field clears that field rather than leaving the stored value.
+ */
 export const UpdateWarrantySchema = z.object({
   provider: z.string().optional(),
   policyNumber: z.string().optional(),
-  expires: z.string().datetime().optional(),
-  coverage: z.string().optional(),
+  startDate: z.string().datetime().optional(),
+  expiryDate: z.string().datetime().optional(),
+  coverageOdometer: z.number().min(0).optional(),
+  coverageType: z
+    .enum(["comprehensive", "powertrain", "extended", "other"])
+    .optional(),
+  notes: z.string().optional(),
 });
 
+/** Same replace-don't-merge semantics as UpdateWarrantySchema. */
 export const UpdateInsuranceSchema = z.object({
   provider: z.string().optional(),
   policyNumber: z.string().optional(),
-  expires: z.string().datetime().optional(),
+  startDate: z.string().datetime().optional(),
+  expiryDate: z.string().datetime().optional(),
+  premium: z.number().min(0).optional(),
+  coverageType: z
+    .enum(["comprehensive", "third_party", "collision", "other"])
+    .optional(),
+  notes: z.string().optional(),
+});
+
+/** Query for `GET /api/v1/vehicles/search`. */
+export const SearchVehiclesSchema = z.object({
+  q: z.string().trim().min(1),
+  page: z.coerce.number().int().min(1).optional(),
+  limit: z.coerce.number().int().min(1).max(100).optional(),
 });
 
 // Types
@@ -141,3 +164,4 @@ export type UpdateOdometerDTO = z.infer<typeof UpdateOdometerSchema>;
 export type TransferOwnershipDTO = z.infer<typeof TransferOwnershipSchema>;
 export type UpdateWarrantyDTO = z.infer<typeof UpdateWarrantySchema>;
 export type UpdateInsuranceDTO = z.infer<typeof UpdateInsuranceSchema>;
+export type SearchVehiclesDTO = z.infer<typeof SearchVehiclesSchema>;

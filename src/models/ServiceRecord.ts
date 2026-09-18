@@ -34,6 +34,18 @@ export interface IServiceRecord extends Document {
     totalCost?: number;
     warrantyMonths?: number;
   }>;
+  laborItems: Types.DocumentArray<{
+    description?: string;
+    hours?: number;
+    rate?: number;
+    total?: number;
+  }>;
+  feedback?: {
+    rating?: number;
+    comment?: string;
+    submittedBy?: Types.ObjectId;
+    submittedAt?: Date;
+  };
   nextService?: {
     recommendedDate?: Date;
     recommendedOdometer?: number;
@@ -105,6 +117,23 @@ const serviceRecordSchema = new Schema<IServiceRecord, IServiceRecordModel>({
     totalCost: Number,
     warrantyMonths: Number
   }],
+
+  // Itemised labour. `cost.laborTotal` stays the authoritative figure and is
+  // recomputed from this array whenever it changes, so the two can't drift.
+  laborItems: [{
+    description: String,
+    hours: { type: Number, min: 0 },
+    rate: { type: Number, min: 0 },
+    total: { type: Number, min: 0 }
+  }],
+
+  // Customer feedback (one per record)
+  feedback: {
+    rating: { type: Number, min: 1, max: 5 },
+    comment: { type: String, maxlength: 1000 },
+    submittedBy: { type: Schema.Types.ObjectId, ref: 'Account' },
+    submittedAt: Date
+  },
 
   // Next Service
   nextService: {

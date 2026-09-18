@@ -40,9 +40,16 @@ registry.registerPath({
 });
 
 registry.registerPath({
-  method: "put", path: `${base}/{id}`, tags: TAGS, summary: "Update an invitation (not implemented — the service only exposes accept/revoke/sendReminder transitions, no generic field update)", security: BEARER_AUTH,
+  method: "put", path: `${base}/{id}`, tags: TAGS,
+  summary: "Edit a pending invitation's message, usage limit or expiry",
+  description: "Only invitations still in `pending` status can be edited, and only these three fields — the invitee and the resource being shared are fixed once the link has gone out. Status transitions go through accept/revoke instead.",
+  security: BEARER_AUTH,
   request: { params: IdParamSchema, ...jsonBody(UpdateInvitationSchema) },
-  responses: { 501: { description: "Not implemented" }, ...commonErrorResponses({ validate: true }) },
+  responses: {
+    200: { description: "Invitation updated", content: { "application/json": { schema: successEnvelope("InvitationUpdatedResponse", record) } } },
+    409: { description: "The invitation is no longer pending" },
+    ...commonErrorResponses({ notFound: true, validate: true }),
+  },
 });
 
 registry.registerPath({

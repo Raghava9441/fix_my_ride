@@ -46,7 +46,14 @@ export interface IServiceCenter extends Document {
     activeVehicles: number;
     totalServiceRecords: number;
     averageRating: number;
+    totalReviews: number;
     totalRevenue: number;
+  };
+  verification: {
+    isVerified: boolean;
+    verifiedBy?: Types.ObjectId;
+    verifiedAt?: Date;
+    notes?: string;
   };
   createdBy: Types.ObjectId;
   isDeleted: boolean;
@@ -142,8 +149,19 @@ const serviceCenterSchema = new Schema<IServiceCenter, IServiceCenterModel>({
     totalVehiclesServed: { type: Number, default: 0 },
     activeVehicles: { type: Number, default: 0 },
     totalServiceRecords: { type: Number, default: 0 },
+    // Both derived from the Review collection; recomputed whenever a review
+    // is written rather than maintained by hand.
     averageRating: { type: Number, default: 0 },
+    totalReviews: { type: Number, default: 0 },
     totalRevenue: { type: Number, default: 0 }
+  },
+
+  // Verification
+  verification: {
+    isVerified: { type: Boolean, default: false },
+    verifiedBy: { type: Schema.Types.ObjectId, ref: 'Account' },
+    verifiedAt: Date,
+    notes: String
   },
 
   // Created by which staff account

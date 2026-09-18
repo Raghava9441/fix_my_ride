@@ -90,3 +90,45 @@ export type UploadDocumentDTO = z.infer<typeof UploadDocumentSchema>;
 export type UpdateDocumentDTO = z.infer<typeof UpdateDocumentSchema>;
 export type VerifyDocumentDTO = z.infer<typeof VerifyDocumentSchema>;
 export type QueryDocumentsDTO = z.infer<typeof QueryDocumentsSchema>;
+
+// ========== PER-ENTITY DOCUMENT DTOs ==========
+
+/**
+ * Multipart form fields always arrive as strings, so the booleans/arrays that
+ * `UploadDocumentSchema` declares natively need coercing before they parse.
+ */
+const multipartBoolean = z.preprocess(
+  (val) => (typeof val === "string" ? val === "true" : val),
+  z.boolean(),
+);
+
+const multipartStringArray = z.preprocess(
+  (val) =>
+    typeof val === "string"
+      ? val
+          .split(",")
+          .map((entry) => entry.trim())
+          .filter(Boolean)
+      : val,
+  z.array(z.string()),
+);
+
+/**
+ * Body schema for the per-entity document endpoints
+ * (`POST /api/v1/vehicles/:id/documents` and its service-record /
+ * service-center siblings). `entityType` is fixed by which router the request
+ * hit and `entityId` comes from the `:id` path param, so both are omitted
+ * here rather than being accepted from the client — otherwise a caller could
+ * attach a file to an entity other than the one in the URL.
+ */
+export const UploadEntityDocumentSchema = UploadDocumentSchema.omit({
+  entityType: true,
+  entityId: true,
+}).extend({
+  tags: multipartStringArray.optional(),
+  isPublic: multipartBoolean.optional().default(false),
+  allowedRoles: multipartStringArray.optional(),
+  allowedAccounts: multipartStringArray.optional(),
+});
+
+export type UploadEntityDocumentDTO = z.infer<typeof UploadEntityDocumentSchema>;

@@ -5,6 +5,9 @@ import {
   CreateServiceRecordInput,
   UpdateServiceRecordInput,
 } from "../services/serviceRecord.service";
+import { DocumentService } from "../services/document.service";
+import { StorageService } from "../services/storage.service";
+import { InvoiceService } from "../services/invoice.service";
 import {
   HttpStatus,
   createSuccessResponse,
@@ -12,8 +15,16 @@ import {
   createPaginatedResponse,
 } from "../utils";
 
+/** Value stored in `Document.entityType` for everything this controller attaches. */
+const ENTITY_TYPE = "service_record" as const;
+
 export class ServiceRecordController {
-  constructor(private readonly serviceRecordService: ServiceRecordService) {}
+  constructor(
+    private readonly serviceRecordService: ServiceRecordService,
+    private readonly documentService: DocumentService,
+    private readonly storageService: StorageService,
+    private readonly invoiceService: InvoiceService,
+  ) {}
 
   async getAll(req: Request, res: Response) {
     const filters = {
@@ -304,67 +315,189 @@ export class ServiceRecordController {
   }
 
   async getLabor(req: Request, res: Response) {
-    const error = createErrorResponse(
-      "Itemized labor tracking is not implemented; ServiceRecord only stores a single cost.laborTotal figure",
-      HttpStatus.NOT_IMPLEMENTED,
-    );
-    return res.status(error.statusCode).json(error.toJSON());
+    const { id } = req.params;
+    const laborItems = await this.serviceRecordService.getLabor(id);
+
+    if (laborItems === null) {
+      const error = createErrorResponse("Service record not found", HttpStatus.NOT_FOUND);
+      return res.status(error.statusCode).json(error.toJSON());
+    }
+
+    const response = createSuccessResponse(laborItems, "Labor items retrieved successfully");
+    return res.status(response.statusCode).json(response.toJSON());
   }
 
-  async addLabor(req: Request, res: Response) {
-    const error = createErrorResponse(
-      "Itemized labor tracking is not implemented; ServiceRecord only stores a single cost.laborTotal figure",
-      HttpStatus.NOT_IMPLEMENTED,
+  async addLabor(req: ValidatedRequest<any>, res: Response) {
+    const { id } = req.params;
+    const result = await this.serviceRecordService.addLabor(id, req.validated);
+
+    if (!result) {
+      const error = createErrorResponse("Service record not found", HttpStatus.NOT_FOUND);
+      return res.status(error.statusCode).json(error.toJSON());
+    }
+
+    const response = createSuccessResponse(
+      result.laborItem,
+      "Labor item added successfully",
+      HttpStatus.CREATED,
     );
-    return res.status(error.statusCode).json(error.toJSON());
+    return res.status(response.statusCode).json(response.toJSON());
   }
 
   async getDocuments(req: Request, res: Response) {
-    const error = createErrorResponse(
-      "Service record documents are not implemented yet",
-      HttpStatus.NOT_IMPLEMENTED,
-    );
-    return res.status(error.statusCode).json(error.toJSON());
+    const { id } = req.params;
+
+    const documents = await this.documentService.findByEntity(ENTITY_TYPE, id, {
+      type: req.query.type as string,
+    });
+
+    const response = createSuccessResponse(documents, "Documents retrieved successfully");
+    return res.status(response.statusCode).json(response.toJSON());
   }
 
-  async uploadDocument(req: Request, res: Response) {
-    const error = createErrorResponse(
-      "Service record documents are not implemented yet",
-      HttpStatus.NOT_IMPLEMENTED,
+  async uploadDocument(req: ValidatedRequest<any>, res: Response) {
+    const { id } = req.params;
+    const file = req.file;
+
+    if (!file) {
+      const error = createErrorResponse("No file was uploaded", HttpStatus.BAD_REQUEST);
+      return res.status(error.statusCode).json(error.toJSON());
+    }
+
+    const record = await this.serviceRecordService.findById(id);
+    if (!record) {
+      const error = createErrorResponse("Service record not found", HttpStatus.NOT_FOUND);
+      return res.status(error.statusCode).json(error.toJSON());
+    }
+
+    const data = req.validated;
+    const stored = await this.storageService.saveFile(
+      file.buffer,
+      file.originalname,
+      file.mimetype,
+      ENTITY_TYPE,
     );
-    return res.status(error.statusCode).json(error.toJSON());
+
+    const document = await this.documentService.create({
+      accountId: data.accountId ?? req.user?.id,
+      originalName: stored.originalName,
+      fileName: stored.fileName,
+      mimeType: stored.mimeType,
+      size: stored.size,
+      extension: stored.extension,
+      storageProvider: stored.storageProvider,
+      url: stored.url,
+      path: stored.path,
+      entityType: ENTITY_TYPE,
+      entityId: id,
+      documentType: data.documentType,
+      description: data.description,
+      tags: data.tags,
+      isPublic: data.isPublic,
+      allowedRoles: data.allowedRoles,
+      allowedAccounts: data.allowedAccounts,
+      validFrom: data.validFrom ? new Date(data.validFrom) : undefined,
+      validUntil: data.validUntil ? new Date(data.validUntil) : undefined,
+      metadata: data.metadata,
+    });
+
+    const response = createSuccessResponse(
+      document,
+      "Document uploaded successfully",
+      HttpStatus.CREATED,
+    );
+    return res.status(response.statusCode).json(response.toJSON());
   }
 
   async deleteDocument(req: Request, res: Response) {
-    const error = createErrorResponse(
-      "Service record documents are not implemented yet",
-      HttpStatus.NOT_IMPLEMENTED,
+    const { id, documentId } = req.params;
+    const document = await this.documentService.findById(documentId);
+
+    // Scoped by entity on purpose: the document id comes from the URL, so
+    // without this a caller could delete any document in the tenant through
+    // a service record they happen to have access to.
+    if (!document || document.entityType !== ENTITY_TYPE || String(document.entityId) !== id) {
+      const error = createErrorResponse("Document not found", HttpStatus.NOT_FOUND);
+      return res.status(error.statusCode).json(error.toJSON());
+    }
+
+    await this.documentService.softDelete(documentId, req.user!.id);
+    await this.storageService.deleteFile(ENTITY_TYPE, document.fileName).catch(() => undefined);
+
+    const response = createSuccessResponse(
+      { id: document._id, deleted: true },
+      "Document deleted successfully",
     );
-    return res.status(error.statusCode).json(error.toJSON());
+    return res.status(response.statusCode).json(response.toJSON());
   }
 
   async getInvoice(req: Request, res: Response) {
-    const error = createErrorResponse(
-      "Invoice retrieval is not implemented yet; no invoice.service.ts exists",
-      HttpStatus.NOT_IMPLEMENTED,
-    );
-    return res.status(error.statusCode).json(error.toJSON());
+    const { id } = req.params;
+    const invoice = await this.invoiceService.findByServiceRecord(id);
+
+    if (!invoice) {
+      const error = createErrorResponse(
+        "No invoice has been generated for this service record",
+        HttpStatus.NOT_FOUND,
+      );
+      return res.status(error.statusCode).json(error.toJSON());
+    }
+
+    const response = createSuccessResponse(invoice, "Invoice retrieved successfully");
+    return res.status(response.statusCode).json(response.toJSON());
   }
 
-  async generateInvoice(req: Request, res: Response) {
-    const error = createErrorResponse(
-      "Invoice generation is not implemented yet; no invoice.service.ts exists",
-      HttpStatus.NOT_IMPLEMENTED,
-    );
-    return res.status(error.statusCode).json(error.toJSON());
+  async generateInvoice(req: ValidatedRequest<any>, res: Response) {
+    const { id } = req.params;
+
+    try {
+      const invoice = await this.invoiceService.generateForServiceRecord(id, req.validated ?? {});
+
+      const response = createSuccessResponse(
+        invoice,
+        "Invoice generated successfully",
+        HttpStatus.CREATED,
+      );
+      return res.status(response.statusCode).json(response.toJSON());
+    } catch (error: any) {
+      if (error.message === "Service record not found") {
+        const apiError = createErrorResponse(error.message, HttpStatus.NOT_FOUND);
+        return res.status(apiError.statusCode).json(apiError.toJSON());
+      }
+      if (error.message === "Owner profile not found for this service record") {
+        const apiError = createErrorResponse(error.message, HttpStatus.NOT_FOUND);
+        return res.status(apiError.statusCode).json(apiError.toJSON());
+      }
+      if (error.message === "Invoice already exists for this service record") {
+        const apiError = createErrorResponse(error.message, HttpStatus.CONFLICT);
+        return res.status(apiError.statusCode).json(apiError.toJSON());
+      }
+      throw error;
+    }
   }
 
   async downloadInvoice(req: Request, res: Response) {
-    const error = createErrorResponse(
-      "Invoice download is not implemented yet; no invoice.service.ts exists",
-      HttpStatus.NOT_IMPLEMENTED,
+    const { id } = req.params;
+    const invoice = await this.invoiceService.findByServiceRecord(id);
+
+    if (!invoice) {
+      const error = createErrorResponse(
+        "No invoice has been generated for this service record",
+        HttpStatus.NOT_FOUND,
+      );
+      return res.status(error.statusCode).json(error.toJSON());
+    }
+
+    const buffer = await this.invoiceService.toExcel(invoice);
+    res.setHeader(
+      "Content-Type",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     );
-    return res.status(error.statusCode).json(error.toJSON());
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="invoice-${invoice.invoiceNumber}.xlsx"`,
+    );
+    return res.status(HttpStatus.OK).send(buffer);
   }
 
   async updateStatus(req: ValidatedRequest<any>, res: Response) {
@@ -391,20 +524,38 @@ export class ServiceRecordController {
     }
   }
 
-  async addFeedback(req: Request, res: Response) {
-    const error = createErrorResponse(
-      "Service record feedback is not implemented yet; ServiceRecord has no feedback field",
-      HttpStatus.NOT_IMPLEMENTED,
+  async addFeedback(req: ValidatedRequest<any>, res: Response) {
+    const { id } = req.params;
+    const feedback = await this.serviceRecordService.addFeedback(
+      id,
+      req.validated,
+      req.user?.id,
     );
-    return res.status(error.statusCode).json(error.toJSON());
+
+    if (!feedback) {
+      const error = createErrorResponse("Service record not found", HttpStatus.NOT_FOUND);
+      return res.status(error.statusCode).json(error.toJSON());
+    }
+
+    const response = createSuccessResponse(
+      feedback,
+      "Feedback submitted successfully",
+      HttpStatus.CREATED,
+    );
+    return res.status(response.statusCode).json(response.toJSON());
   }
 
   async getFeedback(req: Request, res: Response) {
-    const error = createErrorResponse(
-      "Service record feedback is not implemented yet; ServiceRecord has no feedback field",
-      HttpStatus.NOT_IMPLEMENTED,
-    );
-    return res.status(error.statusCode).json(error.toJSON());
+    const { id } = req.params;
+    const feedback = await this.serviceRecordService.getFeedback(id);
+
+    if (feedback === undefined) {
+      const error = createErrorResponse("Service record not found", HttpStatus.NOT_FOUND);
+      return res.status(error.statusCode).json(error.toJSON());
+    }
+
+    const response = createSuccessResponse(feedback, "Feedback retrieved successfully");
+    return res.status(response.statusCode).json(response.toJSON());
   }
 
   async setNextService(req: ValidatedRequest<any>, res: Response) {

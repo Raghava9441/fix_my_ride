@@ -194,22 +194,53 @@ export class RoleController {
     }
   }
 
-  async assignRoleToUser(req: Request, res: Response) {
-    const error = createErrorResponse(
-      "Assigning a role to a user is not implemented here; use the staff endpoints " +
-        "(StaffProfile.roleId, see staff.service.ts) to assign roles to staff members",
-      HttpStatus.NOT_IMPLEMENTED,
-    );
-    return res.status(error.statusCode).json(error.toJSON());
+  async assignRoleToUser(req: ValidatedRequest<any>, res: Response) {
+    const { id } = req.params;
+    const { accountId } = req.validated;
+
+    const staff = await this.roleService.assignToAccount(id, accountId);
+
+    if (staff === null) {
+      const error = createErrorResponse("Role not found", HttpStatus.NOT_FOUND);
+      return res.status(error.statusCode).json(error.toJSON());
+    }
+    if (staff === undefined) {
+      const error = createErrorResponse(
+        "That account has no staff profile — roles attach to staff, not to bare accounts",
+        HttpStatus.NOT_FOUND,
+      );
+      return res.status(error.statusCode).json(error.toJSON());
+    }
+
+    const response = createSuccessResponse(staff, "Role assigned successfully");
+    return res.status(response.statusCode).json(response.toJSON());
   }
 
   async removeRoleFromUser(req: Request, res: Response) {
-    const error = createErrorResponse(
-      "Unassigning a role from a user is not implemented here; use the staff endpoints " +
-        "(StaffProfile.roleId, see staff.service.ts) to remove roles from staff members",
-      HttpStatus.NOT_IMPLEMENTED,
+    const { id, accountId } = req.params;
+
+    const staff = await this.roleService.removeFromAccount(id, accountId);
+
+    if (staff === undefined) {
+      const error = createErrorResponse(
+        "That account has no staff profile",
+        HttpStatus.NOT_FOUND,
+      );
+      return res.status(error.statusCode).json(error.toJSON());
+    }
+    if (staff === null) {
+      const error = createErrorResponse(
+        "That account does not currently hold this role",
+        HttpStatus.CONFLICT,
+      );
+      return res.status(error.statusCode).json(error.toJSON());
+    }
+
+    const response = createSuccessResponse(
+      { accountId, roleId: id, removed: true },
+      "Role removed successfully",
     );
-    return res.status(error.statusCode).json(error.toJSON());
+    return res.status(response.statusCode).json(response.toJSON());
   }
 
   async seedSystemRoles(req: Request, res: Response) {

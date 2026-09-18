@@ -129,11 +129,16 @@ export const UpdatePartSchema = z.object({
   warrantyMonths: z.number().optional(),
 });
 
+/**
+ * `total` is optional and derived from hours x rate when omitted — accepting a
+ * client-supplied total that disagrees with the two would let `cost.laborTotal`
+ * drift away from the labour lines it's summed from.
+ */
 export const AddLaborSchema = z.object({
   description: z.string().min(1),
   hours: z.number().min(0),
   rate: z.number().min(0),
-  total: z.number().min(0),
+  total: z.number().min(0).optional(),
 });
 
 export const UpdateStatusSchema = z.object({
@@ -151,9 +156,19 @@ export const SetNextServiceSchema = z.object({
   serviceType: z.string().optional(),
 });
 
+/**
+ * Body for `POST /api/v1/service-records/{id}/invoice/generate`. Everything is
+ * optional: omitted fields fall back to the service record's own `cost` block,
+ * so the generated invoice totals match the record unless overridden. `taxRate`
+ * is a percentage applied to the line-item subtotal — deliberately not
+ * `.default(0)`, because "omitted" has to stay distinguishable from an explicit
+ * zero for that fallback to work.
+ */
 export const GenerateInvoiceSchema = z.object({
   dueDate: z.string().datetime().optional(),
-  taxRate: z.number().min(0).max(100).default(0),
+  taxRate: z.number().min(0).max(100).optional(),
+  discountAmount: z.number().min(0).optional(),
+  notes: z.string().optional(),
 });
 
 // Types

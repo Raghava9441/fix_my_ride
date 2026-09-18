@@ -61,8 +61,15 @@ registry.registerPath({
 });
 
 registry.registerPath({
-  method: "delete", path: `${base}/{id}/notifications`, tags: TAGS, summary: "Bulk-delete an owner's notifications (not implemented — no bulk-delete-by-recipient method exists)", security: BEARER_AUTH, request: { params: IdParamSchema },
-  responses: { 501: { description: "Not implemented" }, ...commonErrorResponses() },
+  method: "delete", path: `${base}/{id}/notifications`, tags: TAGS,
+  summary: "Bulk-delete an owner's notifications",
+  description: "Deletes every notification for the owner's account by default. Narrow with `status`, or `readOnly=true` to clear only those already read.",
+  security: BEARER_AUTH,
+  request: { params: IdParamSchema, query: z.object({ status: z.string().optional(), readOnly: z.coerce.boolean().optional() }) },
+  responses: {
+    200: { description: "Notifications deleted", content: { "application/json": { schema: successEnvelope("OwnerNotificationsDeletedResponse", z.object({ deletedCount: z.number() })) } } },
+    ...commonErrorResponses({ notFound: true }),
+  },
 });
 
 registry.registerPath({

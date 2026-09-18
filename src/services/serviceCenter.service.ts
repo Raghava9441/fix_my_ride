@@ -390,6 +390,69 @@ export class ServiceCenterService {
     return center;
   }
 
+  /**
+   * Updates one `servicesOffered` entry in place, addressed by its subdocument
+   * id. Returns null when the centre doesn't exist and undefined when it does
+   * but has no such service, so the caller can tell the two 404s apart.
+   */
+  async updateService(
+    serviceCenterId: string,
+    serviceId: string,
+    updates: {
+      name?: string;
+      category?: string;
+      duration?: number;
+      basePrice?: number;
+      isActive?: boolean;
+    },
+  ): Promise<any | null | undefined> {
+    const center = await ServiceCenter.findById(serviceCenterId);
+    if (!center || center.isDeleted) {
+      return null;
+    }
+
+    const service = center.servicesOffered.id(serviceId);
+    if (!service) {
+      return undefined;
+    }
+
+    // Only overwrite what was actually sent — this is a PATCH-shaped update of
+    // a single entry, unlike the vehicle warranty/insurance PUTs.
+    for (const [key, value] of Object.entries(updates)) {
+      if (value !== undefined) {
+        (service as any)[key] = value;
+      }
+    }
+
+    await center.save();
+    return service;
+  }
+
+  /** Marks a centre verified (or un-verified) and records who did it. */
+  async setVerification(
+    serviceCenterId: string,
+    isVerified: boolean,
+    verifiedBy?: string,
+    notes?: string,
+  ): Promise<any | null> {
+    const center = await ServiceCenter.findOneAndUpdate(
+      { _id: serviceCenterId, isDeleted: false },
+      {
+        $set: {
+          verification: {
+            isVerified,
+            verifiedBy: verifiedBy ? new mongoose.Types.ObjectId(verifiedBy) : undefined,
+            verifiedAt: new Date(),
+            notes,
+          },
+        },
+      },
+      { new: true, runValidators: true },
+    );
+
+    return center ? center.verification : null;
+  }
+
   async removeService(
     serviceCenterId: string,
     serviceName: string,

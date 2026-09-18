@@ -151,6 +151,14 @@ export const UpdateServiceSchema = z.object({
 export const CreateReviewSchema = z.object({
   rating: z.number().min(1).max(5),
   comment: z.string().min(1).max(1000),
+  /** Optionally ties the review to the specific job it's about. */
+  serviceRecordId: ObjectIdSchema.optional(),
+});
+
+/** `isVerified` defaults to true so the common case is an empty body. */
+export const VerifyCenterSchema = z.object({
+  isVerified: z.boolean().optional().default(true),
+  notes: z.string().max(1000).optional(),
 });
 
 // Types
@@ -162,3 +170,4 @@ export type UpdateServiceSettingsDTO = z.infer<
 export type AddServiceDTO = z.infer<typeof AddServiceSchema>;
 export type UpdateServiceDTO = z.infer<typeof UpdateServiceSchema>;
 export type CreateReviewDTO = z.infer<typeof CreateReviewSchema>;
+export type VerifyCenterDTO = z.infer<typeof VerifyCenterSchema>;

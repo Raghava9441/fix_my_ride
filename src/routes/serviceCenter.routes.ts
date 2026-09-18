@@ -13,11 +13,18 @@ import {
   AddServiceSchema,
   UpdateServiceSchema,
   CreateReviewSchema,
+  VerifyCenterSchema,
 } from "../dto/service-center.dto";
+import { UploadEntityDocumentSchema } from "../dto/document.dto";
 import { IdParamSchema } from "../dto/account.dto";
 import { authenticate } from "../middleware/auth.middleware";
+import { requireRole } from "../middleware/authorization.middleware";
+import { uploadSingle } from "../middleware/upload.middleware";
 import { ServiceCenterController } from "../controllers/serviceCenter.controller";
 import { serviceCenterService } from "../services/serviceCenter.service";
+import { documentService } from "../services/document.service";
+import { storageService } from "../services/storage.service";
+import { reviewService } from "../services/review.service";
 
 const router = Router();
 
@@ -25,6 +32,9 @@ router.use(authenticate);
 
 const serviceCenterController = new ServiceCenterController(
   serviceCenterService,
+  documentService,
+  storageService,
+  reviewService,
 );
 
 const IdAndServiceIdParamSchema = z.object({
@@ -155,9 +165,13 @@ router.post(
   }),
 );
 
+// Admin-only: verification is a trust signal shown to customers, so a centre
+// must not be able to mark itself verified.
 router.post(
   "/:id/verify",
+  requireRole("admin"),
   validateParams(IdParamSchema),
+  validate(VerifyCenterSchema),
   asyncHandler(async (req: ValidatedRequest<any>, res: Response) => {
     await serviceCenterController.verifyCenter(req, res);
   }),
@@ -166,6 +180,8 @@ router.post(
 router.post(
   "/:id/documents",
   validateParams(IdParamSchema),
+  uploadSingle,
+  validate(UploadEntityDocumentSchema),
   asyncHandler(async (req: ValidatedRequest<any>, res: Response) => {
     await serviceCenterController.uploadDocument(req, res);
   }),

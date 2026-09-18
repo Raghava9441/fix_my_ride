@@ -3,6 +3,7 @@ import { OwnerProfile } from "../models/OwnerProfile";
 import { ServiceCenter } from "../models/ServiceCenter";
 import { ServiceRecord } from "../models/ServiceRecord";
 import { odometerReadingService } from "./odometerReading.service";
+import { escapeRegExp } from "../utils/string";
 import mongoose from "mongoose";
 
 export interface CreateVehicleInput {
@@ -59,6 +60,28 @@ export interface VehicleFilters {
   model?: string;
   year?: number;
   fuelType?: string;
+  /** Free-text term matched against registration, VIN, make, model and colour. */
+  search?: string;
+}
+
+export interface WarrantyInput {
+  provider?: string;
+  policyNumber?: string;
+  startDate?: Date;
+  expiryDate?: Date;
+  coverageOdometer?: number;
+  coverageType?: "comprehensive" | "powertrain" | "extended" | "other";
+  notes?: string;
+}
+
+export interface InsuranceInput {
+  provider?: string;
+  policyNumber?: string;
+  startDate?: Date;
+  expiryDate?: Date;
+  premium?: number;
+  coverageType?: "comprehensive" | "third_party" | "collision" | "other";
+  notes?: string;
 }
 
 export interface PaginatedResult<T> {
@@ -84,6 +107,21 @@ export class VehicleService {
     if (filters?.model) query.model = filters.model;
     if (filters?.year) query.year = filters.year;
     if (filters?.fuelType) query.fuelType = filters.fuelType;
+
+    // Free-text search. There is no text index on this collection, so this is
+    // a case-insensitive regex across the identifying fields; the term is
+    // escaped so a user-supplied string can't act as a pattern.
+    const term = filters?.search?.trim();
+    if (term) {
+      const pattern = new RegExp(escapeRegExp(term), "i");
+      query.$or = [
+        { registrationNumber: pattern },
+        { vin: pattern },
+        { make: pattern },
+        { model: pattern },
+        { color: pattern },
+      ];
+    }
 
     const [vehicles, total] = await Promise.all([
       Vehicle.find(query)
@@ -206,6 +244,27 @@ export class VehicleService {
     });
 
     return vehicle;
+  }
+
+  /**
+   * Replaces the warranty block wholesale rather than merging: the endpoint is
+   * a PUT, so an omitted field means "clear it", not "leave it alone".
+   */
+  async updateWarranty(id: string, input: WarrantyInput): Promise<any | null> {
+    return Vehicle.findOneAndUpdate(
+      { _id: id, isDeleted: false },
+      { $set: { warranty: input } },
+      { new: true, runValidators: true },
+    );
+  }
+
+  /** Same replace-don't-merge semantics as updateWarranty. */
+  async updateInsurance(id: string, input: InsuranceInput): Promise<any | null> {
+    return Vehicle.findOneAndUpdate(
+      { _id: id, isDeleted: false },
+      { $set: { insurance: input } },
+      { new: true, runValidators: true },
+    );
   }
 
   async update(id: string, updates: UpdateVehicleInput): Promise<any | null> {

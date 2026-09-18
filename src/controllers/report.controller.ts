@@ -209,13 +209,7 @@ export class ReportController {
     };
 
     const isExcel = format === "excel";
-    if (format && format !== "csv" && !isExcel) {
-      const error = createErrorResponse(
-        `Not implemented — only "csv" and "excel" export are wired up (no PDF generation library in this codebase yet)`,
-        HttpStatus.NOT_IMPLEMENTED,
-      );
-      return res.status(error.statusCode).json(error.toJSON());
-    }
+    const isPdf = format === "pdf";
 
     let rows: Record<string, unknown>[];
     switch (type) {
@@ -279,6 +273,14 @@ export class ReportController {
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       );
       res.setHeader("Content-Disposition", `attachment; filename="${type}-report.xlsx"`);
+      return res.status(HttpStatus.OK).send(buffer);
+    }
+
+    if (isPdf) {
+      const title = `${type.charAt(0).toUpperCase()}${type.slice(1)} report`;
+      const buffer = await this.reportService.toPdf(rows, title);
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", `attachment; filename="${type}-report.pdf"`);
       return res.status(HttpStatus.OK).send(buffer);
     }
 

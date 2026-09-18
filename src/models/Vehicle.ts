@@ -52,6 +52,28 @@ export interface IVehicle extends Omit<Document, 'model'> {
     nextServiceDueOdometer?: number;
   };
 
+  // Warranty
+  warranty?: {
+    provider?: string;
+    policyNumber?: string;
+    startDate?: Date;
+    expiryDate?: Date;
+    coverageOdometer?: number;
+    coverageType?: 'comprehensive' | 'powertrain' | 'extended' | 'other';
+    notes?: string;
+  };
+
+  // Insurance
+  insurance?: {
+    provider?: string;
+    policyNumber?: string;
+    startDate?: Date;
+    expiryDate?: Date;
+    premium?: number;
+    coverageType?: 'comprehensive' | 'third_party' | 'collision' | 'other';
+    notes?: string;
+  };
+
   isDeleted: boolean;
   deletedAt?: Date;
   createdAt: Date;
@@ -143,6 +165,34 @@ const vehicleSchema = new Schema<IVehicle, IVehicleModel>({
     lastServiceOdometer: Number,
     nextServiceDueDate: Date,
     nextServiceDueOdometer: Number
+  },
+
+  // Warranty
+  warranty: {
+    provider: String,
+    policyNumber: String,
+    startDate: Date,
+    expiryDate: Date,
+    coverageOdometer: { type: Number, min: 0 },
+    coverageType: {
+      type: String,
+      enum: ['comprehensive', 'powertrain', 'extended', 'other']
+    },
+    notes: String
+  },
+
+  // Insurance
+  insurance: {
+    provider: String,
+    policyNumber: String,
+    startDate: Date,
+    expiryDate: Date,
+    premium: { type: Number, min: 0 },
+    coverageType: {
+      type: String,
+      enum: ['comprehensive', 'third_party', 'collision', 'other']
+    },
+    notes: String
   },
 
   isDeleted: { type: Boolean, default: false },

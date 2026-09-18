@@ -51,6 +51,18 @@ export interface CreateServiceRecordInput {
   };
 }
 
+export interface LaborInput {
+  description?: string;
+  hours?: number;
+  rate?: number;
+  total?: number;
+}
+
+export interface FeedbackInput {
+  rating: number;
+  comment: string;
+}
+
 export interface UpdateServiceRecordInput {
   serviceDate?: Date;
   serviceType?:
@@ -325,6 +337,72 @@ export class ServiceRecordService {
       .populate("serviceCenterId", "name");
 
     return record;
+  }
+
+  /** Itemised labour lines, or null when the record doesn't exist. */
+  async getLabor(id: string): Promise<any[] | null> {
+    const record = await ServiceRecord.findById(id);
+    if (!record || record.isDeleted) return null;
+    return record.laborItems.toObject();
+  }
+
+  /**
+   * Appends a labour line and re-derives `cost.laborTotal` from the whole
+   * array, routing through update() so subtotal/total are recalculated too.
+   * `total` defaults to hours x rate when the caller doesn't supply it.
+   */
+  async addLabor(id: string, input: LaborInput): Promise<{ record: any; laborItem: any } | null> {
+    const record = await ServiceRecord.findById(id);
+    if (!record || record.isDeleted) return null;
+
+    const total = input.total ?? (input.hours ?? 0) * (input.rate ?? 0);
+    const laborItems = [
+      ...record.laborItems.toObject(),
+      { description: input.description, hours: input.hours, rate: input.rate, total },
+    ];
+
+    const laborTotal = laborItems.reduce((sum, item) => sum + (item.total ?? 0), 0);
+
+    const updated = await ServiceRecord.findByIdAndUpdate(
+      id,
+      { $set: { laborItems } },
+      { new: true, runValidators: true },
+    );
+    if (!updated) return null;
+
+    const withCost = await this.update(id, { cost: { laborTotal } });
+
+    return {
+      record: withCost ?? updated,
+      laborItem: updated.laborItems[updated.laborItems.length - 1],
+    };
+  }
+
+  /** Customer feedback for a record, or null when the record doesn't exist. */
+  async getFeedback(id: string): Promise<any | null | undefined> {
+    const record = await ServiceRecord.findById(id);
+    if (!record || record.isDeleted) return undefined;
+    return record.feedback ?? null;
+  }
+
+  /** One feedback entry per record — submitting again replaces the previous one. */
+  async addFeedback(id: string, input: FeedbackInput, submittedBy?: string): Promise<any | null> {
+    const record = await ServiceRecord.findOneAndUpdate(
+      { _id: id, isDeleted: false },
+      {
+        $set: {
+          feedback: {
+            rating: input.rating,
+            comment: input.comment,
+            submittedBy: submittedBy ? new mongoose.Types.ObjectId(submittedBy) : undefined,
+            submittedAt: new Date(),
+          },
+        },
+      },
+      { new: true, runValidators: true },
+    );
+
+    return record ? record.feedback : null;
   }
 
   async delete(id: string): Promise<any | null> {

@@ -1,5 +1,6 @@
 import { Role } from "../models/Role";
 import { Permission } from "../models/Permission";
+import { StaffProfile } from "../models/StaffProfile";
 import mongoose from "mongoose";
 
 export interface CreateRoleInput {
@@ -214,6 +215,51 @@ export class RoleService {
 
     await role.removePermission(permissionKey);
     return role;
+  }
+
+  /**
+   * Points a staff member's StaffProfile at this role. Roles attach to staff,
+   * not to bare accounts — StaffProfile.roleId is the only place a role is
+   * ever referenced — so an account with no staff profile can't hold one.
+   * Returns null for an unknown role and undefined when the account has no
+   * staff profile, so the caller can distinguish the two.
+   */
+  async assignToAccount(roleId: string, accountId: string): Promise<any | null | undefined> {
+    const role = await Role.findById(roleId);
+    if (!role || !role.isActive) {
+      return null;
+    }
+
+    const staff = await StaffProfile.findOneAndUpdate(
+      { accountId: new mongoose.Types.ObjectId(accountId), isDeleted: false },
+      { $set: { roleId: new mongoose.Types.ObjectId(roleId) } },
+      { new: true, runValidators: true },
+    ).populate("roleId", "name slug");
+
+    return staff ?? undefined;
+  }
+
+  /**
+   * Clears the role from a staff profile, but only when it currently holds
+   * *this* role — otherwise a stale request could strip an unrelated role
+   * that was assigned in the meantime.
+   */
+  async removeFromAccount(roleId: string, accountId: string): Promise<any | null | undefined> {
+    const staff = await StaffProfile.findOne({
+      accountId: new mongoose.Types.ObjectId(accountId),
+      isDeleted: false,
+    });
+    if (!staff) {
+      return undefined;
+    }
+    if (String(staff.roleId) !== String(roleId)) {
+      return null;
+    }
+
+    staff.set("roleId", undefined);
+    await staff.save({ validateBeforeSave: false });
+
+    return staff;
   }
 
   async getPermissions(roleId: string): Promise<string[]> {

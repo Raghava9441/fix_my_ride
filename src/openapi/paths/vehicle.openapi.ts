@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { registry } from "../registry";
-import { successEnvelope, paginatedEnvelope, commonErrorResponses, BEARER_AUTH, IdParamSchema, PaginationQuerySchema } from "../common";
+import { successEnvelope, paginatedEnvelope, commonErrorResponses, entityDocumentUploadBody, BEARER_AUTH, IdParamSchema, PaginationQuerySchema } from "../common";
 import {
   CreateVehicleSchema,
   UpdateVehicleSchema,
@@ -8,6 +8,9 @@ import {
   UpdateCenterAccessSchema,
   UpdateOdometerSchema,
   TransferOwnershipSchema,
+  UpdateWarrantySchema,
+  UpdateInsuranceSchema,
+  SearchVehiclesSchema,
 } from "../../dto/vehicle.dto";
 import {
   CreateOdometerReadingSchema,
@@ -29,8 +32,12 @@ registry.registerPath({
 });
 
 registry.registerPath({
-  method: "get", path: `${base}/search`, tags: TAGS, summary: "Search vehicles (not implemented — no text-search filter in the service)", security: BEARER_AUTH,
-  responses: { 501: { description: "Not implemented" }, ...commonErrorResponses() },
+  method: "get", path: `${base}/search`, tags: TAGS,
+  summary: "Search vehicles by registration, VIN, make, model or colour",
+  description: "Case-insensitive substring match across the identifying fields. The term is treated as a literal, not a pattern.",
+  security: BEARER_AUTH,
+  request: { query: SearchVehiclesSchema },
+  responses: { 200: { description: "Matching vehicles", content: { "application/json": { schema: paginatedEnvelope("VehicleSearchResponse", record) } } }, ...commonErrorResponses({ validate: true }) },
 });
 
 registry.registerPath({
@@ -149,33 +156,60 @@ registry.registerPath({
   responses: { 200: { description: "Documents", content: { "application/json": { schema: successEnvelope("VehicleDocumentsResponse", z.array(record)) } } }, ...commonErrorResponses({ notFound: true }) },
 });
 
-for (const [method, suffix, summary] of [
-  ["post", "/documents", "Upload a vehicle document (not implemented here — use POST /api/v1/documents/upload)"],
-  ["delete", "/documents/{documentId}", "Delete a vehicle document (not implemented here — use DELETE /api/v1/documents/{id})"],
-  ["get", "/documents/{documentId}/download", "Download a vehicle document (not implemented here — use GET /api/v1/documents/{id}/download)"],
-] as const) {
-  registry.registerPath({
-    method, path: `${base}/{id}${suffix}`, tags: TAGS, summary, security: BEARER_AUTH,
-    request: { params: suffix.includes("documentId") ? withId({ documentId: z.string() }) : IdParamSchema },
-    responses: { 501: { description: "Not implemented" }, ...commonErrorResponses() },
-  });
-}
+registry.registerPath({
+  method: "post", path: `${base}/{id}/documents`, tags: TAGS, summary: "Attach a document to a vehicle (multipart/form-data)", security: BEARER_AUTH,
+  request: { params: IdParamSchema, ...entityDocumentUploadBody() },
+  responses: {
+    201: { description: "Document uploaded", content: { "application/json": { schema: successEnvelope("VehicleDocumentUploadResponse", record) } } },
+    400: { description: "No file uploaded, or unsupported file type" },
+    ...commonErrorResponses({ notFound: true, validate: true }),
+  },
+});
+
+registry.registerPath({
+  method: "delete", path: `${base}/{id}/documents/{documentId}`, tags: TAGS, summary: "Soft-delete a vehicle document and remove the stored file", security: BEARER_AUTH,
+  request: { params: withId({ documentId: z.string() }) },
+  responses: { 200: { description: "Document deleted", content: { "application/json": { schema: successEnvelope("VehicleDocumentDeletedResponse", z.object({ id: z.string(), deleted: z.boolean() })) } } }, ...commonErrorResponses({ notFound: true }) },
+});
+
+registry.registerPath({
+  method: "get", path: `${base}/{id}/documents/{documentId}/download`, tags: TAGS, summary: "Download a vehicle document (redirects when stored off-box)", security: BEARER_AUTH,
+  request: { params: withId({ documentId: z.string() }) },
+  responses: {
+    200: { description: "File contents", content: { "application/octet-stream": { schema: { type: "string", format: "binary" } } } },
+    302: { description: "Redirect to the storage provider's URL for non-local files" },
+    403: { description: "Not accessible to the current user" },
+    ...commonErrorResponses({ notFound: true }),
+  },
+});
 
 registry.registerPath({
   method: "get", path: `${base}/{id}/reminders`, tags: TAGS, summary: "List reminders for a vehicle", security: BEARER_AUTH, request: { params: IdParamSchema },
   responses: { 200: { description: "Reminders", content: { "application/json": { schema: successEnvelope("VehicleRemindersResponse", z.array(record)) } } }, ...commonErrorResponses({ notFound: true }) },
 });
 
-for (const [suffix, label] of [["warranty", "warranty"], ["insurance", "insurance"]] as const) {
+for (const [suffix, label, schema] of [
+  ["warranty", "warranty", UpdateWarrantySchema],
+  ["insurance", "insurance", UpdateInsuranceSchema],
+] as const) {
   registry.registerPath({
-    method: "get", path: `${base}/{id}/${suffix}`, tags: TAGS, summary: `Get vehicle ${label} info (not implemented — no ${label} fields on the Vehicle schema)`, security: BEARER_AUTH,
+    method: "get", path: `${base}/{id}/${suffix}`, tags: TAGS, summary: `Get a vehicle's ${label} details`, security: BEARER_AUTH,
     request: { params: IdParamSchema },
-    responses: { 501: { description: "Not implemented" }, ...commonErrorResponses() },
+    responses: {
+      200: { description: `${label} details, or null if none recorded`, content: { "application/json": { schema: successEnvelope(`Vehicle${label === "warranty" ? "Warranty" : "Insurance"}Response`, record.nullable()) } } },
+      ...commonErrorResponses({ notFound: true }),
+    },
   });
   registry.registerPath({
-    method: "put", path: `${base}/{id}/${suffix}`, tags: TAGS, summary: `Update vehicle ${label} info (not implemented — no ${label} fields on the Vehicle schema)`, security: BEARER_AUTH,
-    request: { params: IdParamSchema, ...jsonBody(record) },
-    responses: { 501: { description: "Not implemented" }, ...commonErrorResponses() },
+    method: "put", path: `${base}/{id}/${suffix}`, tags: TAGS,
+    summary: `Replace a vehicle's ${label} details`,
+    description: `Replaces the whole ${label} block — an omitted field clears it rather than preserving the stored value.`,
+    security: BEARER_AUTH,
+    request: { params: IdParamSchema, ...jsonBody(schema) },
+    responses: {
+      200: { description: `${label} updated`, content: { "application/json": { schema: successEnvelope(`Vehicle${label === "warranty" ? "Warranty" : "Insurance"}UpdatedResponse`, record) } } },
+      ...commonErrorResponses({ notFound: true, validate: true }),
+    },
   });
 }
 

@@ -178,6 +178,35 @@ export class InvitationService {
     return invitation;
   }
 
+  /**
+   * Field-level edit of an invitation that hasn't been used yet. Only the
+   * three fields that don't affect who the invite is for are editable —
+   * status transitions go through accept/revoke, and changing invitee or
+   * resource would silently repoint a link that's already been sent.
+   */
+  async update(
+    id: string,
+    updates: { message?: string; maxUses?: number; expiresAt?: Date },
+  ): Promise<any | null | undefined> {
+    const invitation = await Invitation.findById(id);
+    if (!invitation || invitation.isDeleted) {
+      return null;
+    }
+    if (invitation.status !== "pending") {
+      return undefined;
+    }
+
+    const updateObj: Record<string, unknown> = {};
+    if (updates.message !== undefined) updateObj.message = updates.message;
+    if (updates.maxUses !== undefined) updateObj.maxUses = updates.maxUses;
+    if (updates.expiresAt !== undefined) updateObj.expiresAt = updates.expiresAt;
+
+    return Invitation.findByIdAndUpdate(id, { $set: updateObj }, {
+      new: true,
+      runValidators: true,
+    });
+  }
+
   async accept(id: string, userId: string, userType: string): Promise<any> {
     const invitation = await Invitation.findById(id);
     if (!invitation) {

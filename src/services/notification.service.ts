@@ -190,6 +190,26 @@ export class NotificationService {
     return notification;
   }
 
+  /**
+   * Bulk-deletes a recipient's notifications, optionally narrowed to a status
+   * or to already-read ones. Returns how many were removed.
+   */
+  async deleteByRecipient(
+    recipientId: string,
+    recipientModel: "Account" | "ServiceCenter",
+    options: { status?: string; readOnly?: boolean } = {},
+  ): Promise<number> {
+    const query: any = {
+      recipientId: new mongoose.Types.ObjectId(recipientId),
+      recipientModel,
+    };
+    if (options.status) query.status = options.status;
+    if (options.readOnly) query.status = "read";
+
+    const result = await Notification.deleteMany(query);
+    return result.deletedCount ?? 0;
+  }
+
   async deleteOld(daysToKeep: number = 90): Promise<any> {
     return Notification.deleteOldNotifications(daysToKeep);
   }

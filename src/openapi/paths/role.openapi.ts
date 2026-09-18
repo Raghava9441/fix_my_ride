@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { registry } from "../registry";
 import { successEnvelope, paginatedEnvelope, commonErrorResponses, BEARER_AUTH, IdParamSchema, PaginationQuerySchema } from "../common";
-import { CreateRoleSchema, UpdateRoleSchema, AddPermissionToRoleSchema } from "../../dto/role.dto";
+import { CreateRoleSchema, UpdateRoleSchema, AddPermissionToRoleSchema, AssignRoleToUserSchema } from "../../dto/role.dto";
 
 const TAGS = ["Roles"];
 const record = z.record(z.any());
@@ -52,13 +52,28 @@ registry.registerPath({
 });
 
 registry.registerPath({
-  method: "post", path: `${base}/{id}/assign`, tags: TAGS, summary: "Assign a role to a user (not implemented here — role assignment lives on StaffProfile, see PUT /api/v1/staff/{id})", security: BEARER_AUTH, request: { params: IdParamSchema },
-  responses: { 501: { description: "Not implemented" }, ...commonErrorResponses() },
+  method: "post", path: `${base}/{id}/assign`, tags: TAGS,
+  summary: "Assign a role to an account" + adminNote,
+  description: "Points the account's StaffProfile at this role. Roles attach to staff, not to bare accounts — an account with no staff profile returns 404.",
+  security: BEARER_AUTH,
+  request: { params: IdParamSchema, ...jsonBody(AssignRoleToUserSchema) },
+  responses: {
+    200: { description: "Role assigned", content: { "application/json": { schema: successEnvelope("RoleAssignedResponse", record) } } },
+    ...commonErrorResponses({ notFound: true, validate: true }),
+  },
 });
 
 registry.registerPath({
-  method: "delete", path: `${base}/{id}/assign/{accountId}`, tags: TAGS, summary: "Unassign a role from a user (not implemented — see PUT /api/v1/staff/{id})", security: BEARER_AUTH, request: { params: withId({ accountId: z.string() }) },
-  responses: { 501: { description: "Not implemented" }, ...commonErrorResponses() },
+  method: "delete", path: `${base}/{id}/assign/{accountId}`, tags: TAGS,
+  summary: "Remove a role from an account" + adminNote,
+  description: "Only clears the role when the account currently holds this one, so a stale request can't strip a role assigned in the meantime.",
+  security: BEARER_AUTH,
+  request: { params: withId({ accountId: z.string() }) },
+  responses: {
+    200: { description: "Role removed", content: { "application/json": { schema: successEnvelope("RoleUnassignedResponse", z.object({ accountId: z.string(), roleId: z.string(), removed: z.boolean() })) } } },
+    409: { description: "The account does not currently hold this role" },
+    ...commonErrorResponses({ notFound: true }),
+  },
 });
 
 registry.registerPath({

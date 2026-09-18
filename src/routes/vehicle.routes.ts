@@ -8,6 +8,7 @@ import {
   ValidatedRequest,
 } from "../middleware/validation.middleware";
 import { authenticate } from "../middleware/auth.middleware";
+import { uploadSingle } from "../middleware/upload.middleware";
 import {
   CreateVehicleSchema,
   UpdateVehicleSchema,
@@ -15,6 +16,9 @@ import {
   UpdateCenterAccessSchema,
   UpdateOdometerSchema,
   TransferOwnershipSchema,
+  UpdateWarrantySchema,
+  UpdateInsuranceSchema,
+  SearchVehiclesSchema,
 } from "../dto/vehicle.dto";
 import {
   CreateOdometerReadingSchema,
@@ -22,11 +26,13 @@ import {
   VerifyOdometerSchema,
   QueryOdometerHistorySchema,
 } from "../dto/odometer-reading.dto";
+import { UploadEntityDocumentSchema } from "../dto/document.dto";
 import { IdParamSchema } from "../dto/account.dto";
 import { VehicleController } from "../controllers/vehicle.controller";
 import { OdometerReadingController } from "../controllers/odometerReading.controller";
 import { vehicleService } from "../services/vehicle.service";
 import { documentService } from "../services/document.service";
+import { storageService } from "../services/storage.service";
 import { reminderService } from "../services/reminder.service";
 import { odometerReadingService } from "../services/odometerReading.service";
 
@@ -35,6 +41,7 @@ const router = Router();
 const vehicleController = new VehicleController(
   vehicleService,
   documentService,
+  storageService,
   reminderService,
 );
 
@@ -70,7 +77,8 @@ router.get(
 
 router.get(
   "/search",
-  asyncHandler(async (req: Request, res: Response) => {
+  validateQuery(SearchVehiclesSchema),
+  asyncHandler(async (req: ValidatedRequest<any>, res: Response) => {
     await vehicleController.searchVehicles(req, res);
   }),
 );
@@ -254,6 +262,8 @@ router.get(
 router.post(
   "/:id/documents",
   validateParams(IdParamSchema),
+  uploadSingle,
+  validate(UploadEntityDocumentSchema),
   asyncHandler(async (req: ValidatedRequest<any>, res: Response) => {
     await vehicleController.uploadDocument(req, res);
   }),
@@ -294,6 +304,7 @@ router.get(
 router.put(
   "/:id/warranty",
   validateParams(IdParamSchema),
+  validate(UpdateWarrantySchema),
   asyncHandler(async (req: ValidatedRequest<any>, res: Response) => {
     await vehicleController.updateWarranty(req, res);
   }),
@@ -310,6 +321,7 @@ router.get(
 router.put(
   "/:id/insurance",
   validateParams(IdParamSchema),
+  validate(UpdateInsuranceSchema),
   asyncHandler(async (req: ValidatedRequest<any>, res: Response) => {
     await vehicleController.updateInsurance(req, res);
   }),

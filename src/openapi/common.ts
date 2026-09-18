@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { registry } from "./registry";
+import { UploadDocumentSchema } from "../dto/document.dto";
 
 export const BEARER_AUTH = [{ bearerAuth: [] }];
 
@@ -68,6 +69,34 @@ export function paginatedEnvelope<T extends z.ZodTypeAny>(name: string, itemSche
       timestamp: z.string(),
     }),
   );
+}
+
+/**
+ * `multipart/form-data` request body shared by the per-entity document upload
+ * endpoints (`POST /api/v1/vehicles/{id}/documents` and its service-record /
+ * service-center siblings). `entityType`/`entityId` are absent by design —
+ * both are derived from the route, not the body. The `documentType` enum is
+ * taken from `UploadDocumentSchema` so the two can't drift apart.
+ */
+export function entityDocumentUploadBody() {
+  return {
+    body: {
+      content: {
+        "multipart/form-data": {
+          schema: z.object({
+            file: z.string().openapi({ type: "string", format: "binary" }),
+            documentType: UploadDocumentSchema.shape.documentType,
+            description: z.string().optional(),
+            tags: z.string().optional().openapi({ description: "Comma-separated list of tags" }),
+            isPublic: z.boolean().optional(),
+            allowedRoles: z.string().optional().openapi({ description: "Comma-separated list of role names" }),
+            validFrom: z.string().datetime().optional(),
+            validUntil: z.string().datetime().optional(),
+          }),
+        },
+      },
+    },
+  };
 }
 
 /** Standard 400/401/403/404/422 response set for the given operation. */

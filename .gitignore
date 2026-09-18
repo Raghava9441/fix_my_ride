@@ -51,6 +51,9 @@ logs/
 tmp/
 temp/
 
+# Locally stored uploads (storage.service.ts local provider writes here)
+public/uploads/
+
 # Test
 coverage/
 .nyc_output/
