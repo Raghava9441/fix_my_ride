@@ -1,0 +1,49 @@
+src/seeds/index.ts
+  s_58a7511b4d59a4::t_60135bfe9b8f1a 9,65-67,123
+src/seeds/operational-data.seed.ts
+  s_58a7511b4d59a4::t_3d87fa911bd44a 1-489
+src/config/environment.ts
+  s_6d0dcd74f73904::t_ff98be12ce7bd9 32
+src/config/schema.ts
+  s_6d0dcd74f73904::t_8396de2d27f9dc 33-39
+src/models/Account.ts
+  s_6d0dcd74f73904::t_cb0813ad7f6ecc 59,323-332,337-354
+src/services/auth.service.ts
+  s_4746e00db45e68::t_72fa8647633546 21,482-493,498-505,542-551,555-564
+src/utils/index.ts
+  s_6d0dcd74f73904::t_10cb08b87178e8 16,123-127
+src/utils/totp.ts
+  s_6d0dcd74f73904::t_42101348f3d3c2 1-89
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "f19609279578e9a5b6ba17779617b1b963e10cd5",
+  "prompts": {},
+  "sessions": {
+    "s_4746e00db45e68": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a37b9d2f-dceb-4413-97fb-d2134cb05047",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Raghava9441 <raghavendrareddybollapu556@gmail.com>"
+    },
+    "s_58a7511b4d59a4": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9c8a72ed-784b-4ad3-81e7-0a5ebb5ac1f0",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Raghava9441 <raghavendrareddybollapu556@gmail.com>"
+    },
+    "s_6d0dcd74f73904": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d05c5b4f-5646-4fd3-99be-a816154c6e97",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Raghava9441 <raghavendrareddybollapu556@gmail.com>"
+    }
+  }
+}
