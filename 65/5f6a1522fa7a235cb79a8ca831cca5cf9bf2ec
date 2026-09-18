@@ -1,0 +1,128 @@
+src/models/ServiceCenter.ts
+  s_58a7511b4d59a4::t_94579e966bb512 49,52-57,152-153,155,159-164
+  s_58a7511b4d59a4::t_be5dc4b89fb1b0 165-166
+src/openapi/paths/report.openapi.ts
+  s_58a7511b4d59a4::t_4c52a6f377a613 69-70,74-81
+src/services/serviceCenter.service.ts
+  s_58a7511b4d59a4::t_a146b7a7b00437 393-455
+src/dto/document.dto.ts
+  s_58a7511b4d59a4::t_84047e9cc3197b 94,96-103,105-114,116-131,134
+  s_58a7511b4d59a4::t_191f75f94544c8 93,95,104,115,132-133
+src/openapi/common.ts
+  s_58a7511b4d59a4::t_191f75f94544c8 3,74-101
+src/controllers/serviceCenter.controller.ts
+  s_58a7511b4d59a4::t_191f75f94544c8 8-9,18-20,22-25,27,411,449-498,500,504-511
+  s_58a7511b4d59a4::t_6864f54c2f8de9 10,26,313-319,321-332,395-406,409-410,412-421,423,426-444,446
+src/openapi/paths/serviceRecord.openapi.ts
+  s_58a7511b4d59a4::t_191f75f94544c8 3,158-176,178
+  s_58a7511b4d59a4::t_065b337851b608 12-13,83-123
+  s_58a7511b4d59a4::t_fd0ad882c1091a 11,124-157
+src/routes/vehicle.routes.ts
+  s_58a7511b4d59a4::t_922b354400b5f8 11,29,35,44,265-266
+  s_58a7511b4d59a4::t_5c6269438e3c04 19-21,80-81,307,324
+src/dto/service-record.dto.ts
+  s_58a7511b4d59a4::t_6e6183b7822994 132-136,141
+  s_58a7511b4d59a4::t_49b203e1dd6848 159-166,169-171
+src/services/serviceRecord.service.ts
+  s_58a7511b4d59a4::t_92dbd67904c570 371
+  s_58a7511b4d59a4::t_429323cc9636a9 54-65,342-370,372-407
+src/openapi/paths/invitation.openapi.ts
+  s_58a7511b4d59a4::t_0d7637d2058eb5 43-46,48-52
+src/openapi/paths/vehicle.openapi.ts
+  s_58a7511b4d59a4::t_989b9bc3c2465b 11-13,35-40,191-194,196,198-201,204-212
+  s_58a7511b4d59a4::t_191f75f94544c8 3,159-184
+src/openapi/paths/role.openapi.ts
+  s_58a7511b4d59a4::t_367195ea3a622b 4
+  s_58a7511b4d59a4::t_b81d070900ed6a 55-63,67-76
+src/models/Vehicle.ts
+  s_58a7511b4d59a4::t_6f10c25144b61f 55-76,170-197
+src/services/invoice.service.ts
+  s_58a7511b4d59a4::t_9eb41a97697713 196-199,253
+  s_58a7511b4d59a4::t_849ab1e1eb2ae9 1,4-5,31,36-44,154-195,200-202,204,206-225,233,243-247,249-252,254-306
+  s_58a7511b4d59a4::t_cd458f2c92e068 32-35,203,205,226-232,234-242,248
+src/routes/serviceRecord.routes.ts
+  s_58a7511b4d59a4::t_9b3741028b590f 10,22,27-28,35-36,154-155
+  s_58a7511b4d59a4::t_f5fed91c3f1379 29,37,180
+  s_58a7511b4d59a4::t_d4cfab027abf5b 19-20,137,206
+  s_58a7511b4d59a4::t_1b08379924c583 18,23
+.gitignore
+  s_58a7511b4d59a4::t_78c8fc49319360 54-56
+src/models/index.ts
+  s_58a7511b4d59a4::t_8311dda9aea5b8 23
+  s_58a7511b4d59a4::t_f9605d342fb103 46
+src/dto/vehicle.dto.ts
+  s_58a7511b4d59a4::t_29c517634a1447 122-125,129-135,138,142-155,167
+src/services/review.service.ts
+  s_58a7511b4d59a4::t_d94b365ab8e999 1-74
+src/services/role.service.ts
+  s_58a7511b4d59a4::t_510de50e1b6d36 3
+  s_58a7511b4d59a4::t_9df4bdef73a09a 220-228,230-264
+  s_58a7511b4d59a4::t_33a3f05511e444 229
+src/services/notification.service.ts
+  s_58a7511b4d59a4::t_2c85cd55153b0f 193-212
+package.json
+  s_58a7511b4d59a4::t_95e62dd11545cd 86
+  s_58a7511b4d59a4::t_fe7506ce074740 64
+src/routes/role.routes.ts
+  s_58a7511b4d59a4::t_e5e2a36116b5ce 13,105,107,115
+src/middleware/upload.middleware.ts
+  s_58a7511b4d59a4::t_191f75f94544c8 2,5,38,43-65
+src/utils/string.ts
+  s_58a7511b4d59a4::t_52a3b7b387bab5 95-101,103-104
+  s_58a7511b4d59a4::t_934295433db96e 102
+src/models/Review.ts
+  s_58a7511b4d59a4::t_3e98fbb16df33e 1-146
+src/controllers/owner.controller.ts
+  s_58a7511b4d59a4::t_2c85cd55153b0f 245-259,261-266
+src/services/report.service.ts
+  s_58a7511b4d59a4::t_103c942384537d 3,280-367
+src/controllers/report.controller.ts
+  s_58a7511b4d59a4::t_206a2d216b6342 212,279-286
+src/controllers/serviceRecord.controller.ts
+  s_58a7511b4d59a4::t_7392a947c08fe9 8-9,18-20,22-25,27,348-355,358-378,380-409,413-429,431,495,544
+  s_58a7511b4d59a4::t_d8210389afe3cc 10,26,435-447,450-476,480-494,496-498,500
+  s_58a7511b4d59a4::t_d4cfab027abf5b 318-327,330-342,344,527-532,534-543,545,549-558
+src/services/invitation.service.ts
+  s_58a7511b4d59a4::t_bc99aeb916227e 181-209
+src/dto/service-center.dto.ts
+  s_58a7511b4d59a4::t_53dd0070cd7466 154-161,173
+src/controllers/role.controller.ts
+  s_58a7511b4d59a4::t_510de50e1b6d36 197-216,220-241,243
+src/openapi/paths/owner.openapi.ts
+  s_58a7511b4d59a4::t_0d7637d2058eb5 64-72
+src/controllers/invitation.controller.ts
+  s_58a7511b4d59a4::t_b4d4f07741fafc 176-198
+src/openapi/paths/serviceCenter.openapi.ts
+  s_58a7511b4d59a4::t_1fb78aca96fbc2 73-76,78-81
+  s_58a7511b4d59a4::t_191f75f94544c8 3,125-131,135-137
+  s_58a7511b4d59a4::t_f5ff3e014c679d 11,95-99,103-110,114-121
+src/controllers/vehicle.controller.ts
+  s_58a7511b4d59a4::t_8cdc88182d2ce3 54-68,70,596-606,608,611-627,631-641,643,646-662
+  s_58a7511b4d59a4::t_2bd06841732ed0 10,19-21,26,465-514,516,520-536,538,542-572
+src/models/ServiceRecord.ts
+  s_58a7511b4d59a4::t_5023680c27bffc 37-48,121-137
+src/routes/serviceCenter.routes.ts
+  s_58a7511b4d59a4::t_c3479016d83419 16,21,27,37,168-169,172,174
+  s_58a7511b4d59a4::t_191f75f94544c8 18,22,25-26,35-36,183-184
+src/services/vehicle.service.ts
+  s_58a7511b4d59a4::t_b1a30d8dd8c495 249-269
+  s_58a7511b4d59a4::t_88d8cbc37c020d 6,63-84,111-125
+package-lock.json
+  s_58a7511b4d59a4::t_2e44fe21d5633e 36,58,1409-1416,1698-1706,2246-2260,2308-2321,2742-2757,2896-2912,3085-3092,3496-3501,3550-3585,3601-3632,3685-3689,3856-3879,4562-4591,4699-4706,4910-4920,4930-4940,5151-5163,5193-5223,5230-5243,5256-5281,5297-5311,5351-5361,5371-5385,5395-5436,5448-5504,6145-6150,6350-6366,7129-7170,7382-7393,7596-7611,7904-7922,7997-8001,8070-8085,8182-8211,8427-8438,8730-8734,9016,9117-9139,9307-9361
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "655f6a1522fa7a235cb79a8ca831cca5cf9bf2ec",
+  "prompts": {},
+  "sessions": {
+    "s_58a7511b4d59a4": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9c8a72ed-784b-4ad3-81e7-0a5ebb5ac1f0",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Raghava9441 <raghavendrareddybollapu556@gmail.com>"
+    }
+  }
+}
