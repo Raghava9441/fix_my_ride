@@ -1,0 +1,31 @@
+.github/workflows/ai-percentage-on-push.yml
+  s_10e590701c6782::t_d094de294ffb87 1-71
+scripts/compute-and-update.mjs
+  s_10e590701c6782::t_75a1c51c764124 63-68,125
+  s_10e590701c6782::t_d094de294ffb87 241
+  s_10e590701c6782::t_1c17d2d50aeb63 145-146
+  s_10e590701c6782::t_c8ca55a1fddf9d 162-164,244
+  s_10e590701c6782::t_466636931e9fcb 92
+  s_10e590701c6782::t_8b32a70c632707 1-62,69-91,93-124,126-144,147-161,165-240,242-243,245
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "a050442cb037e62a41661fd5211f8db8ee6f9849",
+  "prompts": {},
+  "humans": {
+    "h_3594bdeeba2d56": {
+      "author": "Raghava9441 <raghavendrareddybollapu556@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_10e590701c6782": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5a401a8c-0d19-405d-b1e8-6793f7d7fbd6",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "Raghava9441 <raghavendrareddybollapu556@gmail.com>"
+    }
+  }
+}
