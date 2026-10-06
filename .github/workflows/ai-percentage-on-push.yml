@@ -2,6 +2,7 @@ name: AI percentage on push
 
 # Runs scripts/compute-and-update.mjs on every push and logs the AI-contribution
 # percentage of the pushed commits. Log-only: no Jira or other API is called.
+# It reads refs/notes/ai with plain git, so git-ai does not need to be installed.
 
 on:
   push:
@@ -23,12 +24,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
-
-      - name: Install Git AI
-        run: |
-          set -euo pipefail
-          curl -fsSL https://usegitai.com/install.sh | bash
-          echo "$HOME/.git-ai/bin" >> "$GITHUB_PATH"
 
       - name: Fetch attribution notes
         run: git fetch --no-tags origin '+refs/notes/ai:refs/notes/ai' || echo "No refs/notes/ai on the remote yet."

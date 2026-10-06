@@ -1,15 +1,19 @@
 /**
- * Computes the AI-contribution percentage of a range of commits from git-ai line attribution and
- * logs it. Nothing is written anywhere -- no Jira or other API calls are made.
+ * Computes the AI-contribution percentage of a range of commits and logs it. Nothing is written
+ * anywhere -- no Jira or other API calls are made, and the git-ai binary is NOT needed.
  *
- * Percentage source: git ai stats <base>..<head> --json, which reads line-level attribution from
- * the refs/notes/ai git-notes ref. git-ai pushes that ref automatically alongside the branch, and
- * a fresh clone reproduces identical numbers once the ref is fetched.
+ * It reproduces what `git ai stats <base>..<head>` does, using only plain git and the attribution
+ * notes git-ai stores in refs/notes/ai:
+ *   1. added lines   = `git diff --numstat base head` (the NET diff, so lines rewritten later in
+ *                      the range count once), minus git-ai's default ignore patterns (lockfiles,
+ *                      generated files, vendor dirs, .gitattributes linguist-generated, .git-ai-ignore)
+ *   2. which commit  = `git blame` of every added line at head -> the commit that introduced it
+ *   3. AI or human   = that commit's note (`git notes --ref=ai show <sha>`) lists AI line ranges per
+ *                      file as of that commit; the blamed line is looked up in it
+ * AI % = AI lines / added lines. Added lines with no matching attestation are "unknown".
  *
- * MUST be given the original pre-merge range, never a squash/merge commit:
- *   - a squashed commit is a new SHA with no note -> every line reads as unknown
- *   - a true merge commit is skipped entirely by git-ai -> all counters return 0
- * Both cases would silently yield 0%. The guards below reject them rather than logging a wrong value.
+ * Pass the original pre-merge range, never a squash commit: a squashed commit is a new SHA with no
+ * note, so every line reads as unknown. The guards below reject that rather than log a wrong value.
  *
  * Usage:
  *   node compute-and-update.mjs --base <sha> --head <sha>
@@ -17,7 +21,6 @@
  *   node compute-and-update.mjs --pr 499 --ticket MEW-1234   (ticket is optional, label only)
  *
  * Env:
- *   GIT_AI_BIN       default "git-ai" from PATH
  *   ALLOW_PARTIAL    "true" to warn instead of abort when some commits lack attribution
  *   GITHUB_OUTPUT    when set (GitHub Actions), ai_percent / rounded_percent are written to it
  */
@@ -34,7 +37,6 @@ function arg(name, fallback = undefined) {
 
 const PR = arg("pr");
 
-const GIT_AI_BIN = process.env.GIT_AI_BIN ?? "git-ai";
 const ALLOW_PARTIAL = process.env.ALLOW_PARTIAL === "true";
 
 function fail(message) {
@@ -52,7 +54,11 @@ function warn(message) {
 
 function git(args, allowFail = false) {
   try {
-    return execFileSync("git", args, { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
+    return execFileSync("git", args, {
+      encoding: "utf8",
+      maxBuffer: 64 * 1024 * 1024,
+      stdio: ["ignore", "pipe", allowFail ? "ignore" : "inherit"],
+    });
   } catch (error) {
     if (allowFail) return "";
     throw error;
@@ -124,29 +130,6 @@ function resolvePr(spec) {
 
   if (ticket) console.log(`  ticket ${ticket} (resolved from: ${source})`);
 
-  // git ai stats <range> resolves the range against the CURRENTLY CHECKED-OUT branch, and fails
-  // with "Commit <sha> is not reachable from refname refs/heads/<branch>" if the range sits on a
-  // different line of history. Fetching the PR ref is not enough, and neither is creating a local
-  // ref for it -- only the checked-out branch counts. Detect it here so the message names the fix
-  // instead of surfacing git-ai's internal one.
-  const headReachable = (() => {
-    try {
-      execFileSync("git", ["merge-base", "--is-ancestor", info.headRefOid, "HEAD"], { stdio: "ignore" });
-      return true;
-    } catch {
-      return false;
-    }
-  })();
-
-  if (!headReachable) {
-    const current = git(["rev-parse", "--abbrev-ref", "HEAD"], true).trim();
-    fail(
-      `PR #${number}'s head (${info.headRefOid.slice(0, 8)}) is not reachable from the checked-out branch ` +
-        `"${current}", and git-ai resolves ranges against the current branch only.\n` +
-        `Run this from the PR's branch:  git checkout ${info.headRefName}`
-    );
-  }
-
   return { ticket, base: info.baseRefOid, head: info.headRefOid };
 }
 
@@ -168,32 +151,195 @@ if (!BASE || !HEAD) {
 
 // ---------------------------------------------------------------- 1. read attribution
 
-let raw;
-try {
-  raw = execFileSync(GIT_AI_BIN, ["stats", `${BASE}..${HEAD}`, "--json"], { encoding: "utf8" });
-} catch (error) {
-  fail(`git-ai stats failed for ${BASE}..${HEAD}: ${error.message}`);
+// ---- ignore patterns (same defaults and matching as git-ai)
+
+const DEFAULT_IGNORE_PATTERNS = [
+  "*.lock", "Cargo.lock", "package-lock.json", "yarn.lock", "pnpm-lock.yaml", "go.sum", "Gemfile.lock",
+  "poetry.lock", "composer.lock", "Pipfile.lock", "shrinkwrap.yaml",
+  "*.generated.*", "*.min.js", "*.min.css", "*.map", "**/__snapshots__/**", "**/*.snap", "**/drizzle/meta/**",
+  "**/vendor/**", "**/node_modules/**",
+  "*.pbobjc.h", "*.pbobjc.m", "*.pb.go", "*_pb2.py", "*_pb2_grpc.py", "*.pb.swift", "*.pb.dart", "*.pb.cc", "*.pb.h",
+];
+
+function readRepoFile(name) {
+  return git(["show", `${HEAD}:${name}`], true);
 }
 
-let parsed;
-try {
-  parsed = JSON.parse(raw);
-} catch {
-  fail(`git-ai returned unparseable JSON: ${raw.slice(0, 300)}`);
+function effectiveIgnorePatterns() {
+  const patterns = [...DEFAULT_IGNORE_PATTERNS];
+  for (const line of readRepoFile(".gitattributes").split("\n")) {
+    if (line.includes("linguist-generated") && !line.includes("linguist-generated=false")) {
+      const pattern = line.trim().split(/\s+/)[0];
+      if (pattern && !pattern.startsWith("#")) patterns.push(pattern);
+    }
+  }
+  for (const line of readRepoFile(".git-ai-ignore").split("\n")) {
+    const pattern = line.trim();
+    if (pattern && !pattern.startsWith("#")) patterns.push(pattern);
+  }
+  return [...new Set(patterns)];
 }
 
-// A single commit returns the stats object directly; a range nests it under range_stats and adds a
-// per-commit coverage audit under authorship_stats.
-const stats = parsed.range_stats ?? parsed;
-const audit = parsed.authorship_stats ?? null;
+// Glob semantics of the Rust `glob` crate with default options: `*` and `?` cross "/" too.
+function globToRegex(glob) {
+  let out = "";
+  for (let i = 0; i < glob.length; i++) {
+    const c = glob[i];
+    if (c === "*" && glob[i + 1] === "*") {
+      i++;
+      if (glob[i + 1] === "/") {
+        i++;
+        out += "(?:.*/)?";
+      } else out += ".*";
+    } else if (c === "*") out += ".*";
+    else if (c === "?") out += ".";
+    else out += c.replace(/[.+^${}()|[\]\\]/g, "\\$&");
+  }
+  return new RegExp(`^${out}$`);
+}
 
-const added = stats.git_diff_added_lines ?? 0;
-const ai = stats.ai_additions ?? 0;
-const human = stats.human_additions ?? 0;
-const unknown = stats.unknown_additions ?? 0;
-const breakdown = stats.tool_model_breakdown ?? {};
+const ignoreRegexes = effectiveIgnorePatterns().map(globToRegex);
+function isIgnored(path) {
+  const filename = path.split("/").pop();
+  return ignoreRegexes.some((re) => re.test(path) || re.test(filename));
+}
 
-console.log(`Range ${BASE}..${HEAD}`);
+// ---- notes
+
+// A note is an attestation section, a "---" line, then a JSON metadata section:
+//   src/a.ts                          <- file path (not indented)
+//     s_4746e0::t_4d3002 1-33,40      <- "<session>::<turn> <line ranges>" (indented)
+//   ---
+//   { "sessions": { "s_4746e0": { "agent_id": { "tool": "claude", "model": "..." } } }, ... }
+// Line numbers are those of the file as of the commit the note is attached to. Ids starting "h_"
+// are known-human lines; every other id (a session, or a legacy prompt hash) is AI.
+function parseRanges(text) {
+  return text
+    .split(",")
+    .map((part) => part.trim().split("-").map(Number))
+    .filter(([from]) => Number.isFinite(from))
+    .map(([from, to]) => [from, Number.isFinite(to) ? to : from]);
+}
+
+const noteCache = new Map();
+function loadNote(sha) {
+  if (noteCache.has(sha)) return noteCache.get(sha);
+
+  const text = git(["notes", "--ref=ai", "show", sha], true);
+  if (text.trim() === "") {
+    noteCache.set(sha, null);
+    return null;
+  }
+
+  const sep = text.indexOf("\n---");
+  let meta = {};
+  try {
+    if (sep !== -1) meta = JSON.parse(text.slice(sep + 4));
+  } catch {
+    // Unreadable metadata only costs the per-tool breakdown; line classification still works.
+  }
+
+  const files = new Map(); // path -> [{ id, ranges }]
+  let current = null;
+  for (const line of (sep === -1 ? text : text.slice(0, sep)).split("\n")) {
+    if (!line.trim()) continue;
+    const entry = line.match(/^\s+(\S+)\s+([\d,\-\s]+)$/);
+    if (entry && current) {
+      current.push({ id: entry[1].split("::")[0], ranges: parseRanges(entry[2]) });
+    } else if (!/^\s/.test(line)) {
+      const path = line.trim().replace(/^"(.*)"$/, "$1");
+      current = files.get(path) ?? [];
+      files.set(path, current);
+    }
+  }
+
+  const note = { files, agents: { ...(meta.prompts ?? {}), ...(meta.sessions ?? {}) } };
+  noteCache.set(sha, note);
+  return note;
+}
+
+// -> { kind: "ai" | "human" | "unknown", tool }
+function classify(sha, path, line) {
+  const note = loadNote(sha);
+  const entries = note?.files.get(path);
+  if (!entries) return { kind: "unknown" };
+
+  for (const { id, ranges } of entries) {
+    if (!ranges.some(([from, to]) => line >= from && line <= to)) continue;
+    if (id.startsWith("h_")) return { kind: "human" };
+    const agent = note.agents[id]?.agent_id;
+    return { kind: "ai", tool: agent ? `${agent.tool}::${agent.model}` : "unknown::unknown" };
+  }
+  return { kind: "unknown" };
+}
+
+// ---- the net diff
+
+// path -> line numbers added at HEAD, from the `git diff -U0` hunk headers.
+function addedLinesByFile() {
+  const byFile = new Map();
+  let path = null;
+  for (const row of git(["diff", "-U0", "--no-renames", "--no-color", "--no-textconv", BASE, HEAD]).split("\n")) {
+    if (row.startsWith("+++ ")) {
+      path = row.startsWith("+++ b/") ? row.slice(6) : null; // "+++ /dev/null" = deleted file
+    } else if (path && row.startsWith("@@")) {
+      const m = row.match(/\+(\d+)(?:,(\d+))?/);
+      const start = Number(m[1]);
+      const count = m[2] === undefined ? 1 : Number(m[2]);
+      if (!byFile.has(path)) byFile.set(path, []);
+      for (let n = start; n < start + count; n++) byFile.get(path).push(n);
+    }
+  }
+  return byFile;
+}
+
+// final line number -> { sha, origLine, origPath } for every line of `path` at HEAD.
+function blameFile(path) {
+  const out = git(["blame", "--line-porcelain", `${BASE}..${HEAD}`, "--", path], true);
+  const lines = new Map();
+  let cur = null;
+  for (const row of out.split("\n")) {
+    const header = row.match(/^([0-9a-f]{40}) (\d+) (\d+)/);
+    if (header) {
+      cur = { sha: header[1], origLine: Number(header[2]), origPath: path };
+      lines.set(Number(header[3]), cur);
+    } else if (cur && row.startsWith("filename ")) {
+      cur.origPath = row.slice(9);
+    }
+  }
+  return lines;
+}
+
+const commitSet = new Set(git(["rev-list", `${BASE}..${HEAD}`], true).split("\n").filter(Boolean));
+const nonMerge = git(["rev-list", "--no-merges", `${BASE}..${HEAD}`], true).split("\n").filter(Boolean);
+const withoutNote = nonMerge.filter((sha) => loadNote(sha) === null);
+
+let added = 0;
+let ai = 0;
+let human = 0;
+const breakdown = {};
+
+for (const [path, addedLines] of addedLinesByFile()) {
+  if (isIgnored(path)) continue;
+  added += addedLines.length;
+
+  const blame = blameFile(path);
+  for (const line of addedLines) {
+    const origin = blame.get(line);
+    // A line blamed outside the range cannot have been written in it, so it has no attribution here.
+    if (!origin || !commitSet.has(origin.sha)) continue;
+
+    const result = classify(origin.sha, origin.origPath, origin.origLine);
+    if (result.kind === "ai") {
+      ai++;
+      breakdown[result.tool] = (breakdown[result.tool] ?? 0) + 1;
+    } else if (result.kind === "human") human++;
+  }
+}
+
+const unknown = added - ai - human;
+
+console.log(`Range ${BASE}..${HEAD} (${nonMerge.length} non-merge commits)`);
 console.log(`  added=${added} ai=${ai} human=${human} unknown=${unknown}`);
 console.log(`  tools=${JSON.stringify(breakdown)}`);
 
@@ -203,8 +349,8 @@ console.log(`  tools=${JSON.stringify(breakdown)}`);
 
 if (added === 0) {
   fail(
-    "git-ai reports 0 added lines. This is the signature of being handed a merge commit " +
-      "(git-ai skips commits with >1 parent) or an empty range. Pass the pre-merge base..head range."
+    "The range has 0 added lines. It is empty, or contains only merge commits (which carry no " +
+      "attribution). Pass the pre-merge base..head range."
   );
 }
 
@@ -215,10 +361,8 @@ if (unknown === added) {
   );
 }
 
-if (audit && Array.isArray(audit.commits_without_authorship) && audit.commits_without_authorship.length > 0) {
-  const missing = audit.commits_without_authorship.length;
-  const total = audit.total_commits ?? "?";
-  const message = `${missing} of ${total} commits carry no attribution data; the percentage is computed over partial data.`;
+if (withoutNote.length > 0) {
+  const message = `${withoutNote.length} of ${nonMerge.length} commits carry no attribution data; the percentage is computed over partial data.`;
   if (ALLOW_PARTIAL) warn(message);
   else fail(`${message} Set ALLOW_PARTIAL=true to report anyway.`);
 }
