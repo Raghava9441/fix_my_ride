@@ -1,0 +1,80 @@
+src/routes/webhook.routes.ts
+  s_6d239750ca8b1a::t_5d6e69b9aa3765 5,23-34
+  s_6d239750ca8b1a::t_fbe5b5c4fadf98 35-37
+CLAUDE.md
+  s_6d239750ca8b1a::t_a1886b8d084616 68
+src/services/notification.service.ts
+  s_6d239750ca8b1a::t_5d6e69b9aa3765 2,126-130
+  s_6d239750ca8b1a::t_01d49f6eb5c5cb 13
+  s_6d239750ca8b1a::t_02ad8230f0401b 131
+.env.example
+  s_6d239750ca8b1a::t_01d49f6eb5c5cb 76-91
+src/models/Invoice.ts
+  s_6d239750ca8b1a::t_b37d291bf1a9bd 46-54,131-137
+src/config/environment.ts
+  s_6d239750ca8b1a::t_01d49f6eb5c5cb 74-84
+src/controllers/serviceRecord.controller.ts
+  s_6d239750ca8b1a::t_9cdaac0bfa384e 491-501
+src/models/Notification.ts
+  s_6d239750ca8b1a::t_01d49f6eb5c5cb 11,106
+src/services/invoicePdf.service.ts
+  s_6d239750ca8b1a::t_b37d291bf1a9bd 1-110
+src/controllers/whatsappWebhook.controller.ts
+  s_6d239750ca8b1a::t_1c12275b797866 1-53
+src/jobs/whatsapp.job.ts
+  s_6d239750ca8b1a::t_309e18c014c994 1-55
+src/openapi/paths/serviceRecord.openapi.ts
+  s_6d239750ca8b1a::t_f04c7aa4f927f8 149-150,154
+src/config/schema.ts
+  s_6d239750ca8b1a::t_01d49f6eb5c5cb 95-108
+src/services/serviceRecord.service.ts
+  s_6d239750ca8b1a::t_75705c5cf6d325 8-66,354-360,542-547
+  s_6d239750ca8b1a::t_8aee4e9c084c16 548
+docs/whatsapp.md
+  s_6d239750ca8b1a::t_f324a6ff1aea9c 1-42
+src/jobs/email.job.ts
+  s_6d239750ca8b1a::t_2eab5698013b2f 5-7,15-16,109-153,155-156,158-167
+  s_6d239750ca8b1a::t_f04c7aa4f927f8 157
+  s_6d239750ca8b1a::t_75705c5cf6d325 154
+  s_6d239750ca8b1a::t_0446406a7af41e 168
+src/routes/invoice.routes.ts
+  s_6d239750ca8b1a::t_9cdaac0bfa384e 43-50
+src/config/whatsapp.ts
+  s_6d239750ca8b1a::t_6c1af65a06fe37 1-142
+src/services/whatsapp.service.ts
+  s_6d239750ca8b1a::t_ebb16cb5d42282 1-80
+src/services/billing.service.ts
+  s_6d239750ca8b1a::t_75705c5cf6d325 9,184-204
+  s_6d239750ca8b1a::t_8efb243f5269c0 205-206
+src/services/invoice.service.ts
+  s_6d239750ca8b1a::t_2eab5698013b2f 9-15,250,263-312,424-426
+src/controllers/invoice.controller.ts
+  s_6d239750ca8b1a::t_9cdaac0bfa384e 68-90
+docs/queue.md
+  s_6d239750ca8b1a::t_10bb2f858cd8b9 21-24
+src/openapi/paths/invoice.openapi.ts
+  s_6d239750ca8b1a::t_10bb2f858cd8b9 46,50-52
+  s_6d239750ca8b1a::t_d0c2ce571d90ae 53-54
+src/models/Account.ts
+  s_6d239750ca8b1a::t_01d49f6eb5c5cb 48,196-201
+src/workers/index.ts
+  s_6d239750ca8b1a::t_5d6e69b9aa3765 5,10,25-30,33
+src/dto/notification.dto.ts
+  s_6d239750ca8b1a::t_01d49f6eb5c5cb 56
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "9204baa7d16f0d4aa921bbafda1ddaadaa596b3b",
+  "prompts": {},
+  "sessions": {
+    "s_6d239750ca8b1a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "29c7a7a2-2e24-47c1-92e9-0fa5fc67216a",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "Raghava9441 <raghavendrareddybollapu556@gmail.com>"
+    }
+  }
+}
