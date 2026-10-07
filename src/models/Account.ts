@@ -45,6 +45,7 @@ export interface IAccount extends Document {
       email: { marketing: boolean; transactional: boolean; security: boolean };
       sms: { enabled: boolean; marketing: boolean };
       push: { enabled: boolean; deviceTokens: string[] };
+      whatsapp: { enabled: boolean };
     };
   };
   deletedAt?: Date;
@@ -192,6 +193,12 @@ const accountSchema = new Schema<IAccount, IAccountModel>({
       push: {
         enabled: { type: Boolean, default: false },
         deviceTokens: [{ type: String, select: false }]
+      },
+      // Opt-out switch for WhatsApp updates (also flipped by a STOP reply
+      // via the WhatsApp webhook). Defaults on: owners with a phone number
+      // receive updates unless they opt out.
+      whatsapp: {
+        enabled: { type: Boolean, default: true }
       }
     }
   },

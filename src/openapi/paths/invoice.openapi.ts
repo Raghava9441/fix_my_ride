@@ -43,8 +43,13 @@ registry.registerPath({
 });
 
 registry.registerPath({
-  method: "post", path: `${base}/{id}/send`, tags: TAGS, summary: "Mark an invoice as sent (staff/admin only)", security: BEARER_AUTH, request: { params: IdParamSchema },
+  method: "post", path: `${base}/{id}/send`, tags: TAGS, summary: "Mark an invoice as sent and email it to the owner with the PDF attached (staff/admin only)", security: BEARER_AUTH, request: { params: IdParamSchema },
   responses: { 200: { description: "Invoice marked as sent", content: { "application/json": { schema: successEnvelope("InvoiceResponse", record) } } }, ...commonErrorResponses({ notFound: true }) },
+});
+
+registry.registerPath({
+  method: "get", path: `${base}/{id}/pdf`, tags: TAGS, summary: "Download the invoice as a PDF (owner of the invoice, staff or admin)", security: BEARER_AUTH, request: { params: IdParamSchema },
+  responses: { 200: { description: "Invoice PDF", content: { "application/pdf": { schema: { type: "string", format: "binary" } } } }, ...commonErrorResponses({ notFound: true }) },
 });
 
 registry.registerPath({

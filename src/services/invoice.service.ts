@@ -6,6 +6,13 @@ import { OwnerProfile } from "../models/OwnerProfile";
 import { getRazorpayClient } from "../config/razorpay";
 import { paymentService } from "./payment.service";
 import mongoose from "mongoose";
+import { renderInvoicePdf } from "./invoicePdf.service";
+import { storageService } from "./storage.service";
+import { enqueue } from "./queue.service";
+
+// Matches EMAIL_QUEUE in src/workers/index.ts — literal to avoid a circular import.
+const EMAIL_QUEUE = "emails";
+const PDF_SUBFOLDER = "invoices";
 
 export interface CreateInvoiceInput {
   tenantId?: string;
@@ -240,7 +247,7 @@ export class InvoiceService {
         ? Math.round(subtotal * options.taxRate) / 100
         : (record.cost?.tax ?? 0);
 
-    return this.create({
+    const created = await this.create({
       accountId: String(owner.accountId),
       serviceCenterId: String(record.serviceCenterId),
       serviceRecordIds: [String(record._id)],
@@ -253,6 +260,56 @@ export class InvoiceService {
       billingEmail: account?.email ?? owner.alternateEmail ?? undefined,
       billingAddress: owner.address,
     });
+
+    // Invoices raised from a service record go straight to the owner:
+    // draft -> sent, with the PDF generated and emailed in the background.
+    return this.markAsSent(String(created._id));
+  }
+
+  /**
+   * Renders the invoice to PDF and stores it through StorageService (local
+   * public/uploads/invoices by default, Cloudinary when STORAGE_PROVIDER is
+   * cloudinary). Replaces any previously stored copy so the file always
+   * reflects the invoice's current state.
+   */
+  async generatePdf(id: string): Promise<{ invoice: any; buffer: Buffer }> {
+    const invoice = await Invoice.findById(id).populate("serviceCenterId", "name");
+    if (!invoice) {
+      throw new Error("Invoice not found");
+    }
+
+    const buffer = await renderInvoicePdf(invoice);
+    const previous = invoice.pdf;
+
+    const stored = await storageService.saveFile(
+      buffer,
+      `${invoice.invoiceNumber}.pdf`,
+      "application/pdf",
+      PDF_SUBFOLDER,
+    );
+    invoice.pdf = {
+      url: stored.url,
+      fileName: stored.fileName,
+      storageProvider: stored.storageProvider,
+      generatedAt: new Date(),
+    };
+    await invoice.save();
+
+    if (previous?.fileName) {
+      await storageService.deleteFile(PDF_SUBFOLDER, previous.fileName).catch(() => {});
+    }
+
+    return { invoice, buffer };
+  }
+
+  /** Renders the PDF without storing it (used for on-demand downloads). */
+  async renderPdf(invoice: any): Promise<Buffer> {
+    return renderInvoicePdf(invoice);
+  }
+
+  /** Queues the PDF-attached invoice email to the billed owner. */
+  async queueInvoiceEmail(id: string): Promise<void> {
+    await enqueue(EMAIL_QUEUE, { type: "invoice_email", data: { invoiceId: id } });
   }
 
   /**
@@ -364,7 +421,9 @@ export class InvoiceService {
     if (!invoice) {
       throw new Error("Invoice not found");
     }
-    return invoice.markAsSent();
+    const sent = await invoice.markAsSent();
+    await this.queueInvoiceEmail(id);
+    return sent;
   }
 
   async void(id: string, reason?: string): Promise<any> {

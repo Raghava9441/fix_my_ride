@@ -65,6 +65,7 @@ Two things happen transparently via request-scoped context (`AsyncLocalStorage`)
 | [docs/error-handling.md](docs/error-handling.md) | `ERROR_CODES` catalog, `AppError.fromCode`, the global error handler |
 | [docs/security.md](docs/security.md) | AuthN/AuthZ, sanitization, rate limiting, passwords, known gaps |
 | [docs/queue.md](docs/queue.md) | The custom Redis job queue — the `emails` queue, cron-driven sweeps, and what remains scaffolding |
+| [docs/whatsapp.md](docs/whatsapp.md) | WhatsApp Cloud API notifications: flow, setup checklist, opt-out |
 | [docs/logging.md](docs/logging.md) | winston conventions, structured log fields |
 | [docs/performance.md](docs/performance.md) | Response cache, rate limiters, what's implemented vs. stubbed |
 | [docs/testing.md](docs/testing.md) | Current state (none) and what to set up if you're adding the first tests |

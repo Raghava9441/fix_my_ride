@@ -146,12 +146,12 @@ registry.registerPath({
 
 registry.registerPath({
   method: "get", path: `${base}/{id}/invoice/download`, tags: TAGS,
-  summary: "Download the invoice as a spreadsheet",
-  description: "Returns .xlsx rather than PDF — `exceljs` is already a dependency whereas no PDF generator is, the same constraint documented on POST /api/v1/reports/export.",
+  summary: "Download the invoice (PDF by default, ?format=xlsx for a spreadsheet)",
+  description: "Returns a PDF unless `format=xlsx` is passed, in which case it returns the .xlsx workbook.",
   security: BEARER_AUTH,
   request: { params: IdParamSchema },
   responses: {
-    200: { description: "Invoice workbook", content: { "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": { schema: { type: "string", format: "binary" } } } },
+    200: { description: "Invoice file", content: { "application/pdf": { schema: { type: "string", format: "binary" } }, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": { schema: { type: "string", format: "binary" } } } },
     ...commonErrorResponses({ notFound: true }),
   },
 });

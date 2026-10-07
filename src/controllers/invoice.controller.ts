@@ -65,6 +65,29 @@ export class InvoiceController {
     return res.status(response.statusCode).json(response.toJSON());
   }
 
+  async downloadPdf(req: Request, res: Response) {
+    const { id } = req.params;
+    const invoice = await this.invoiceService.findById(id);
+    if (!invoice) {
+      const error = createErrorResponse("Invoice not found", HttpStatus.NOT_FOUND);
+      return res.status(error.statusCode).json(error.toJSON());
+    }
+
+    // Owners may only fetch their own invoice; staff/admin (already
+    // tenant-scoped by the Mongoose plugin) may fetch any.
+    const roles = req.user?.roles ?? [];
+    const isPrivileged = roles.includes("admin") || roles.includes("staff");
+    if (!isPrivileged && String(invoice.accountId?._id ?? invoice.accountId) !== req.user?.id) {
+      const error = createErrorResponse("You don't have access to this invoice", HttpStatus.FORBIDDEN);
+      return res.status(error.statusCode).json(error.toJSON());
+    }
+
+    const buffer = await this.invoiceService.renderPdf(invoice);
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="${invoice.invoiceNumber}.pdf"`);
+    return res.status(HttpStatus.OK).send(buffer);
+  }
+
   async pay(req: Request, res: Response) {
     const { id } = req.params;
 

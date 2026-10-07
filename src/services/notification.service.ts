@@ -1,4 +1,5 @@
 import { Notification } from "../models/Notification";
+import { queueWhatsAppForNotification } from "./whatsapp.service";
 import mongoose from "mongoose";
 
 export interface CreateNotificationInput {
@@ -9,7 +10,7 @@ export interface CreateNotificationInput {
   recipientModel: "Account" | "ServiceCenter";
   title: string;
   content: string;
-  channel: "email" | "sms" | "push" | "in_app";
+  channel: "email" | "sms" | "push" | "in_app" | "whatsapp";
   type: string;
   data?: {
     vehicleId?: string;
@@ -121,6 +122,12 @@ export class NotificationService {
       provider: input.provider || "internal",
       isDeleted: false,
     });
+
+    // Mirror every Account-bound notification to WhatsApp (no-op when
+    // WhatsApp isn't configured; the job also honours the owner's opt-out).
+    if (input.recipientModel === "Account") {
+      await queueWhatsAppForNotification(String(notification._id));
+    }
 
     return notification;
   }

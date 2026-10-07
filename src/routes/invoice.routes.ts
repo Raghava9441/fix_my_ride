@@ -40,6 +40,14 @@ router.post(
   }),
 );
 
+router.get(
+  "/:id/pdf",
+  validateParams(IdParamSchema),
+  asyncHandler(async (req: Request, res: Response) => {
+    await invoiceController.downloadPdf(req, res);
+  }),
+);
+
 router.post(
   "/:id/pay",
   validateParams(IdParamSchema),

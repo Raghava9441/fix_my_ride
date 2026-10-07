@@ -53,7 +53,7 @@ export const NotificationFiltersSchema = z.object({
       "security_alert",
     ])
     .optional(),
-  channel: z.enum(["email", "sms", "push", "in_app"]).optional(),
+  channel: z.enum(["email", "sms", "push", "in_app", "whatsapp"]).optional(),
   limit: z.number().min(1).max(100).default(20),
   skip: z.number().min(0).default(0),
   unreadOnly: z.boolean().default(false),

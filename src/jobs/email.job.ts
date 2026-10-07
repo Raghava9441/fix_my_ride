@@ -2,6 +2,9 @@
 import { sendEmail } from "../config/email";
 import { config } from "../config/environment";
 import { logger } from "../config/logger";
+import { Account } from "../models/Account";
+import { invoiceService } from "../services/invoice.service";
+import { notificationService } from "../services/notification.service";
 
 export type EmailJobType =
   | "email_verification"
@@ -9,7 +12,8 @@ export type EmailJobType =
   | "org_submitted_for_review"
   | "org_approved"
   | "org_rejected"
-  | "invitation";
+  | "invitation"
+  | "invoice_email";
 
 /**
  * Handlers consumed by the queue worker. Each handler is idempotent and
@@ -101,5 +105,65 @@ export const emailHandlers: Record<EmailJobType, (data: Record<string, any>) => 
       text: `${inviterText} to Fix My Ride. Accept: ${url}`,
     });
     if (!result.success) throw new Error(result.error || "Email send failed");
+  },
+
+  async invoice_email(data) {
+    if (!data.invoiceId) {
+      throw new Error("invoice_email job missing invoiceId");
+    }
+
+    // Re-renders (and re-stores) the PDF so the attachment matches the
+    // invoice's current state even if it was edited since being queued.
+    const { invoice, buffer } = await invoiceService.generatePdf(data.invoiceId);
+    if (["void", "cancelled"].includes(invoice.status)) return;
+
+    const to =
+      invoice.billingEmail ?? (await Account.findById(invoice.accountId).select("email"))?.email;
+    if (!to) {
+      throw new Error(`Invoice ${invoice.invoiceNumber} has no billing email`);
+    }
+
+    const link = invoice.pdf?.url?.startsWith("/")
+      ? `${config.appUrl}${invoice.pdf.url}`
+      : invoice.pdf?.url;
+    const due = new Date(invoice.dueDate).toISOString().slice(0, 10);
+    const amount = `${invoice.currency} ${invoice.amountDue.toFixed(2)}`;
+
+    const result = await sendEmail({
+      to,
+      subject: `Invoice ${invoice.invoiceNumber} - Fix My Ride`,
+      html: `<p>Hi${invoice.billingName ? ` ${invoice.billingName}` : ""},</p><p>Your invoice <b>${invoice.invoiceNumber}</b> for <b>${amount}</b> is due on ${due}. It is attached as a PDF.</p>${link ? `<p><a href="${link}">View invoice online</a></p>` : ""}`,
+      text: `Your invoice ${invoice.invoiceNumber} for ${amount} is due on ${due}.${link ? ` View: ${link}` : ""}`,
+      attachments: [
+        { filename: `${invoice.invoiceNumber}.pdf`, content: buffer, contentType: "application/pdf" },
+      ],
+    });
+    if (!result.success) throw new Error(result.error || "Email send failed");
+
+    invoice.emailedAt = new Date();
+    await invoice.save();
+
+    // In-app notice so the owner also sees it in /notifications. Failure here
+    // must not fail the job — that would re-send the email on retry.
+    try {
+      await notificationService.create({
+        tenantId: invoice.tenantId ? String(invoice.tenantId) : undefined,
+        recipientId: String(invoice.accountId),
+        recipientModel: "Account",
+        title: `New invoice ${invoice.invoiceNumber}`,
+        content: `Invoice ${invoice.invoiceNumber} for ${amount} is due on ${due}.${link ? ` View/download: ${link}` : ""}`,
+        channel: "in_app",
+        type: "invoice_generated",
+        data: { customData: { invoiceId: String(invoice._id), pdfUrl: invoice.pdf?.url } },
+        priority: "medium",
+        status: "sent",
+      });
+    } catch (err) {
+      logger.error({
+        type: "invoice_notification_failed",
+        invoiceId: String(invoice._id),
+        error: (err as Error).message,
+      });
+    }
   },
 };

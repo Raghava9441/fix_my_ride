@@ -5,6 +5,65 @@ import { ServiceCenter } from "../models/ServiceCenter";
 import { StaffProfile } from "../models/StaffProfile";
 import { odometerReadingService } from "./odometerReading.service";
 import mongoose from "mongoose";
+import { notificationService } from "./notification.service";
+import { logger } from "../config/logger";
+
+type RecordStatus = "scheduled" | "in_progress" | "completed" | "cancelled";
+
+const STATUS_UPDATE: Record<RecordStatus, { type: string; title: string; verb: string }> = {
+  scheduled: { type: "appointment_confirmation", title: "Service scheduled", verb: "has been scheduled" },
+  in_progress: { type: "maintenance_update", title: "Service started", verb: "is now in progress" },
+  completed: { type: "service_completed", title: "Service completed", verb: "has been completed" },
+  cancelled: { type: "appointment_cancelled", title: "Service cancelled", verb: "has been cancelled" },
+};
+
+/**
+ * Tells the vehicle owner about a service lifecycle change. Creates an
+ * in-app notification for the owner's account; notificationService.create
+ * also mirrors it to WhatsApp. Best-effort: a notification failure must
+ * never fail the service-record write that triggered it.
+ */
+async function notifyOwnerOfServiceUpdate(
+  record: any,
+  status: RecordStatus,
+  vehicle?: { make?: string; model?: string; registrationNumber?: string } | null,
+  centerName?: string,
+): Promise<void> {
+  try {
+    const owner = await OwnerProfile.findById(record.ownerId).select("accountId");
+    if (!owner?.accountId) return;
+
+    const { type, title, verb } = STATUS_UPDATE[status];
+    const vehicleLabel = vehicle
+      ? [vehicle.make, vehicle.model, vehicle.registrationNumber ? `(${vehicle.registrationNumber})` : ""]
+          .filter(Boolean)
+          .join(" ")
+      : "your vehicle";
+    const where = centerName ? ` at ${centerName}` : "";
+
+    await notificationService.create({
+      tenantId: record.tenantId ? String(record.tenantId) : undefined,
+      recipientId: String(owner.accountId),
+      recipientModel: "Account",
+      title,
+      content: `${record.serviceType} for ${vehicleLabel}${where} ${verb}.`,
+      channel: "in_app",
+      type,
+      data: {
+        vehicleId: record.vehicleId?._id ? String(record.vehicleId._id) : String(record.vehicleId),
+        serviceRecordId: String(record._id),
+      },
+      priority: status === "cancelled" ? "high" : "medium",
+      status: "sent",
+    });
+  } catch (err) {
+    logger.error({
+      type: "service_update_notification_failed",
+      serviceRecordId: String(record?._id),
+      error: (err as Error).message,
+    });
+  }
+}
 
 export interface CreateServiceRecordInput {
   tenantId?: string;
@@ -292,6 +351,13 @@ export class ServiceRecordService {
       });
     }
 
+    await notifyOwnerOfServiceUpdate(
+      record,
+      (record.status as RecordStatus) ?? "scheduled",
+      vehicle,
+      serviceCenter.name,
+    );
+
     return record;
   }
 
@@ -472,6 +538,13 @@ export class ServiceRecordService {
         await serviceCenter.save();
       }
     }
+
+    await notifyOwnerOfServiceUpdate(
+      record,
+      status,
+      record.vehicleId as any,
+      (record.serviceCenterId as any)?.name,
+    );
 
     return record;
   }

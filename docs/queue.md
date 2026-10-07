@@ -18,6 +18,10 @@ await addJob("emails", { type: "welcome_email", data: { accountId, email } });
 
 The `type` must match a key in whatever handlers object the target queue registered (`emailHandlers` for the `"emails"` queue).
 
+## Invoice delivery
+
+`invoice.service.markAsSent()` (also called automatically after `generateForServiceRecord`) enqueues an `invoice_email` job on the `emails` queue. The handler in `jobs/email.job.ts` re-renders the PDF (`invoicePdf.service.ts`, pdfkit), stores it via `StorageService` under `invoices/` (local `public/uploads/invoices`, served at `/uploads/invoices/...`, or Cloudinary when `STORAGE_PROVIDER=cloudinary` and credentials are set), emails it to `billingEmail` (falling back to the account email) as an attachment, sets `Invoice.emailedAt`, and adds an in-app `invoice_generated` notification. Owners can also pull the PDF from `GET /invoices/:id/pdf`.
+
 ## Scheduled (cron) jobs
 
 `jobs/scheduler.ts` (`startScheduledJobs()`, started from `workers/index.ts`) runs `node-cron` sweeps that are cross-tenant by design (no request context). Delivery goes through the `"emails"` queue via the `notification_email` handler in `jobs/notification.job.ts`:

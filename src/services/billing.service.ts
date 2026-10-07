@@ -6,6 +6,7 @@ import { Tenant } from "../models/Tenant";
 import { ServiceCenter } from "../models/ServiceCenter";
 import { Account } from "../models/Account";
 import { logger } from "../config/logger";
+import { notificationService } from "./notification.service";
 
 export interface RazorpayPaymentEntity {
   id: string;
@@ -178,6 +179,29 @@ export class BillingService {
       if (invoice) {
         await invoice.recordPayment(payment.totalAmount);
       }
+    }
+
+    // Receipt to the payer (in-app + WhatsApp). Best-effort: the payment is
+    // already captured, so a notification failure must not fail the webhook.
+    try {
+      await notificationService.create({
+        tenantId: payment.tenantId ? String(payment.tenantId) : undefined,
+        recipientId: String(payment.accountId),
+        recipientModel: "Account",
+        title: "Payment received",
+        content: `We received your payment of ${payment.currency ?? ""} ${Number(payment.totalAmount).toFixed(2)}. Thank you!`.replace(/\s+/g, " "),
+        channel: "in_app",
+        type: "payment_received",
+        data: { amount: payment.totalAmount, currency: payment.currency },
+        priority: "medium",
+        status: "sent",
+      });
+    } catch (err) {
+      logger.error({
+        type: "payment_notification_failed",
+        paymentId: String(payment._id),
+        error: (err as Error).message,
+      });
     }
 
     logger.info({

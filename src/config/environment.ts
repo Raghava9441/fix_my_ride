@@ -71,6 +71,17 @@ export const config = {
     phoneNumber: env.TWILIO_PHONE_NUMBER,
   },
 
+  whatsapp: {
+    accessToken: env.WHATSAPP_ACCESS_TOKEN,
+    phoneNumberId: env.WHATSAPP_PHONE_NUMBER_ID,
+    apiVersion: env.WHATSAPP_API_VERSION,
+    defaultCountryCode: env.WHATSAPP_DEFAULT_COUNTRY_CODE,
+    templateName: env.WHATSAPP_NOTIFICATION_TEMPLATE,
+    templateLanguage: env.WHATSAPP_TEMPLATE_LANGUAGE,
+    webhookVerifyToken: env.WHATSAPP_WEBHOOK_VERIFY_TOKEN,
+    appSecret: env.WHATSAPP_APP_SECRET,
+  },
+
   storage: {
     provider: env.STORAGE_PROVIDER,
     uploadDir: env.UPLOAD_DIR,

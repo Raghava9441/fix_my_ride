@@ -488,6 +488,17 @@ export class ServiceRecordController {
       return res.status(error.statusCode).json(error.toJSON());
     }
 
+    // PDF by default; ?format=xlsx keeps the spreadsheet export available.
+    if (req.query.format !== "xlsx") {
+      const pdf = await this.invoiceService.renderPdf(invoice);
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader(
+        "Content-Disposition",
+        `attachment; filename="invoice-${invoice.invoiceNumber}.pdf"`,
+      );
+      return res.status(HttpStatus.OK).send(pdf);
+    }
+
     const buffer = await this.invoiceService.toExcel(invoice);
     res.setHeader(
       "Content-Type",

@@ -43,6 +43,15 @@ export interface IInvoice extends Document {
   voidReason?: string;
 
   notes?: string;
+  /** Stored PDF copy (see invoice.service.generatePdf). */
+  pdf?: {
+    url: string;
+    fileName: string;
+    storageProvider: "local" | "cloudinary";
+    generatedAt: Date;
+  };
+  /** Set when the invoice email has been delivered to the owner. */
+  emailedAt?: Date;
   billingEmail?: string;
   billingName?: string;
   billingAddress?: {
@@ -119,6 +128,13 @@ const invoiceSchema = new Schema<IInvoice, IInvoiceModel>(
     voidReason: String,
 
     notes: String,
+    pdf: {
+      url: String,
+      fileName: String,
+      storageProvider: { type: String, enum: ["local", "cloudinary"] },
+      generatedAt: Date,
+    },
+    emailedAt: Date,
     billingEmail: String,
     billingName: String,
     billingAddress: {

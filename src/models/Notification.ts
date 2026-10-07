@@ -8,7 +8,7 @@ export interface INotification extends Document {
     recipientModel: 'Account' | 'ServiceCenter';
     title: string;
     content: string;
-    channel: 'email' | 'sms' | 'push' | 'in_app';
+    channel: 'email' | 'sms' | 'push' | 'in_app' | 'whatsapp';
     type: string;
     data?: Record<string, any>;
     status: 'pending' | 'queued' | 'sent' | 'delivered' | 'failed' | 'read' | 'clicked' | 'cancelled';
@@ -103,7 +103,7 @@ const notificationSchema = new Schema<INotification, INotificationModel>({
     // Channel
     channel: {
         type: String,
-        enum: ['email', 'sms', 'push', 'in_app'],
+        enum: ['email', 'sms', 'push', 'in_app', 'whatsapp'],
         required: true,
         index: true
     },

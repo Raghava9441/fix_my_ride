@@ -92,6 +92,20 @@ export const envSchema = z
     TWILIO_AUTH_TOKEN: z.string().optional(),
     TWILIO_PHONE_NUMBER: z.string().optional(),
 
+    // ─── WhatsApp (Meta WhatsApp Business Cloud API) ────────────────────
+    // Disabled unless both ACCESS_TOKEN and PHONE_NUMBER_ID are set.
+    WHATSAPP_ACCESS_TOKEN: z.string().optional(),
+    WHATSAPP_PHONE_NUMBER_ID: z.string().optional(),
+    WHATSAPP_API_VERSION: z.string().default("v20.0"),
+    WHATSAPP_DEFAULT_COUNTRY_CODE: z.string().regex(/^\d{1,3}$/).default("91"),
+    // Business-initiated messages outside the 24h window must use an approved
+    // template. When set, notifications are sent through this template with
+    // two body params: {{1}} title, {{2}} content.
+    WHATSAPP_NOTIFICATION_TEMPLATE: z.string().optional(),
+    WHATSAPP_TEMPLATE_LANGUAGE: z.string().default("en"),
+    WHATSAPP_WEBHOOK_VERIFY_TOKEN: z.string().optional(),
+    WHATSAPP_APP_SECRET: z.string().optional(),
+
     // ─── Storage ────────────────────────────────────────────────────────
     STORAGE_PROVIDER: z.enum(["local", "s3", "cloudinary"]).default("local"),
     UPLOAD_DIR: z.string().optional(),
