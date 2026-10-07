@@ -2,6 +2,7 @@ import { OwnerProfile } from "../models/OwnerProfile";
 import { Vehicle } from "../models/Vehicle";
 import { ServiceRecord } from "../models/ServiceRecord";
 import mongoose from "mongoose";
+import { recomputeOwnerStats } from "./ownerStats";
 
 export interface CreateOwnerProfileInput {
   accountId: string;
@@ -232,27 +233,55 @@ export class OwnerProfileService {
     return owner;
   }
 
+  /**
+   * Every vehicle currently owned by this customer.
+   *
+   * Queries `Vehicle.currentOwnerId` rather than reading the embedded
+   * `OwnerProfile.vehicles[]` array. That array is a denormalisation only
+   * this service maintains — `vehicleService.create` sets `currentOwnerId`
+   * and never touches it — so reading it returned an empty list for every
+   * vehicle registered through the normal path, on a customer whose service
+   * history plainly referenced those same vehicles.
+   *
+   * `stats.totalVehicles` is counted from the same field, so the number in a
+   * list and the rows on the detail screen can no longer disagree.
+   *
+   * The array is still carried for `isPrimary` / `addedAt`, which exist
+   * nowhere else; a vehicle missing from it simply has no primary flag
+   * rather than vanishing from the result.
+   */
   async getVehicles(ownerId: string): Promise<any[]> {
     const owner = await OwnerProfile.findOne({
       _id: ownerId,
       isDeleted: false,
-    }).populate({
-      path: "vehicles.vehicleId",
-      populate: [
-        { path: "currentOwnerId", select: "firstName lastName" },
-        { path: "authorizedServiceCenters.serviceCenterId", select: "name" },
-      ],
     });
 
     if (!owner) {
       throw new Error("Owner profile not found");
     }
 
-    return owner.vehicles.map((v) => ({
-      ...(v.vehicleId as any)?.toObject(),
-      isPrimary: v.isPrimary,
-      addedAt: v.addedAt,
-    }));
+    const vehicles = await Vehicle.find({
+      currentOwnerId: ownerId,
+      isDeleted: false,
+    })
+      .populate("currentOwnerId", "firstName lastName")
+      .populate("authorizedServiceCenters.serviceCenterId", "name")
+      .sort({ createdAt: -1 });
+
+    const membership = new Map(
+      owner.vehicles
+        .filter((v) => v.vehicleId)
+        .map((v) => [v.vehicleId!.toString(), v]),
+    );
+
+    return vehicles.map((vehicle) => {
+      const entry = membership.get(vehicle._id.toString());
+      return {
+        ...vehicle.toObject(),
+        isPrimary: entry?.isPrimary ?? false,
+        addedAt: entry?.addedAt ?? vehicle.createdAt,
+      };
+    });
   }
 
   async getServiceHistory(
@@ -323,6 +352,15 @@ export class OwnerProfileService {
     };
   }
 
+  /**
+   * Recomputes this customer's counters and returns the updated profile.
+   *
+   * The arithmetic lives in `ownerStats.ts` because `vehicleService` and
+   * `serviceRecordService` have to run it too, and importing this service
+   * from them would close a cycle. This stays as the endpoint-facing way to
+   * force a refresh — useful after a bulk import or a data repair, where no
+   * single mutation fired.
+   */
   async updateStats(ownerId: string): Promise<any> {
     const owner = await OwnerProfile.findOne({
       _id: ownerId,
@@ -333,37 +371,11 @@ export class OwnerProfileService {
       throw new Error("Owner profile not found");
     }
 
-    const [vehicleCount, serviceCount, expenseResult] = await Promise.all([
-      Vehicle.countDocuments({
-        currentOwnerId: ownerId,
-        isDeleted: false,
-      }),
-      ServiceRecord.countDocuments({
-        ownerId: ownerId,
-        isDeleted: false,
-      }),
-      ServiceRecord.aggregate([
-        {
-          $match: {
-            ownerId: new mongoose.Types.ObjectId(ownerId),
-            isDeleted: false,
-          },
-        },
-        {
-          $group: {
-            _id: null,
-            total: { $sum: "$cost.total" },
-          },
-        },
-      ]),
-    ]);
+    await recomputeOwnerStats(ownerId);
 
-    owner.stats.totalVehicles = vehicleCount;
-    owner.stats.totalServices = serviceCount;
-    owner.stats.totalSpent = expenseResult[0]?.total || 0;
-
-    await owner.save();
-    return owner;
+    // Re-read rather than returning the stale in-memory copy: the recompute
+    // wrote through `updateOne`, so `owner` still holds the old counters.
+    return OwnerProfile.findById(ownerId);
   }
 
   async canAccessResource(

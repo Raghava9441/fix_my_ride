@@ -7,6 +7,7 @@ import { odometerReadingService } from "./odometerReading.service";
 import mongoose from "mongoose";
 import { notificationService } from "./notification.service";
 import { logger } from "../config/logger";
+import { refreshOwnerStats } from "./ownerStats";
 
 type RecordStatus = "scheduled" | "in_progress" | "completed" | "cancelled";
 
@@ -358,6 +359,11 @@ export class ServiceRecordService {
       serviceCenter.name,
     );
 
+    // A new job changes both the owner's service count and their lifetime
+    // spend, and the customer list reads those counters rather than
+    // recounting per row.
+    await refreshOwnerStats(record.ownerId, "service record create");
+
     return record;
   }
 
@@ -401,6 +407,14 @@ export class ServiceRecordService {
     })
       .populate("vehicleId", "registrationNumber make model")
       .populate("serviceCenterId", "name");
+
+    // Only a cost change moves the owner's totals. Parts and labour edits
+    // route through here too (`addLabor` re-derives `cost.laborTotal` and
+    // calls update), so this one hook covers every path that can change what
+    // a customer has spent.
+    if (record && updates.cost) {
+      await refreshOwnerStats(record.ownerId, "service record cost update");
+    }
 
     return record;
   }
@@ -477,6 +491,12 @@ export class ServiceRecordService {
       { $set: { isDeleted: true, deletedAt: new Date() } },
       { new: true },
     );
+
+    // The filter is `isDeleted: false`, so a second delete of the same record
+    // returns null and correctly skips the recompute rather than redoing it.
+    if (record) {
+      await refreshOwnerStats(record.ownerId, "service record delete");
+    }
 
     return record;
   }
