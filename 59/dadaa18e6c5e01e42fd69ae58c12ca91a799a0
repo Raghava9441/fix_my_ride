@@ -1,0 +1,53 @@
+docs/folder-structure.md
+  s_718e89c9eef585::t_3a32a94f5fff63 22,48
+src/jobs/invoice.job.ts
+  s_718e89c9eef585::t_e839cc885e8003 1-56
+src/middleware/rateLimit.middleware.ts
+  s_718e89c9eef585::t_714f882a3d38ff 1-49
+src/routes/serviceRecord.routes.ts
+  s_718e89c9eef585::t_6f16797c2bf9f7 10,103,113,123,140,184,202
+docs/rbac.md
+  s_718e89c9eef585::t_3a32a94f5fff63 19,25
+docs/security.md
+  s_718e89c9eef585::t_3a32a94f5fff63 7
+src/routes/auth.routes.ts
+  s_718e89c9eef585::t_d864c04f5fc0d9 4,54,134,146,167
+src/jobs/cleanup.job.ts
+  s_718e89c9eef585::t_7d533fb51b9735 1-17
+src/controllers/admin.controller.ts
+  s_718e89c9eef585::t_d864c04f5fc0d9 277-279
+src/routes/report.routes.ts
+  s_718e89c9eef585::t_6f16797c2bf9f7 4,51,54,57,60,63
+src/jobs/scheduler.ts
+  s_718e89c9eef585::t_d57ca921061ae8 5-6,31-43,46-51
+docs/queue.md
+  s_718e89c9eef585::t_3a32a94f5fff63 21-23,25-32,34
+src/routes/document.routes.ts
+  s_718e89c9eef585::t_6f16797c2bf9f7 4,68
+src/openapi/paths/admin.openapi.ts
+  s_718e89c9eef585::t_d864c04f5fc0d9 202,204
+CLAUDE.md
+  s_718e89c9eef585::t_57257b8b2517b3 67
+  s_718e89c9eef585::t_3a32a94f5fff63 69,77
+src/services/admin.service.ts
+  s_718e89c9eef585::t_d864c04f5fc0d9 2,174-199
+  s_718e89c9eef585::t_81a3f4117ea88c 200
+docs/performance.md
+  s_718e89c9eef585::t_3a32a94f5fff63 12-13
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "59dadaa18e6c5e01e42fd69ae58c12ca91a799a0",
+  "prompts": {},
+  "sessions": {
+    "s_718e89c9eef585": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4bb46129-c204-460b-90bc-71d64b87421f",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "Raghava9441 <raghavendrareddybollapu556@gmail.com>"
+    }
+  }
+}
