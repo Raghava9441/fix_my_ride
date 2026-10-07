@@ -1,0 +1,29 @@
+src/scripts/backfill-owner-stats.ts
+  s_b7e1d198fc1e98::t_a31706bed54dae 1-98
+src/services/ownerStats.ts
+  s_b7e1d198fc1e98::t_092ae3d808f32c 1-90
+package.json
+  s_b7e1d198fc1e98::t_689111a75be6db 25
+src/services/owner.service.ts
+  s_b7e1d198fc1e98::t_eb30bb1b43bed1 5,236-252,263-284,355-363,374,376-378
+src/services/serviceRecord.service.ts
+  s_b7e1d198fc1e98::t_5030b7e89e5ef9 10,362-366,411-418,495-500
+src/services/vehicle.service.ts
+  s_b7e1d198fc1e98::t_4ad29859bdd39c 7,247-248,308-312,503-507,535-539,543-547
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "d75d1c926fc11d19c163068b1c13201c42869a09",
+  "prompts": {},
+  "sessions": {
+    "s_b7e1d198fc1e98": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "91cb1339-5a4e-4f2c-a5c4-99710e206f8c",
+        "model": "claude-opus-5"
+      },
+      "human_author": null
+    }
+  }
+}
