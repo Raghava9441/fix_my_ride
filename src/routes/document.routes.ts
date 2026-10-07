@@ -1,6 +1,7 @@
 import { Router, Request, Response } from "express";
 import { asyncHandler } from "../utils";
 import { authenticate } from "../middleware/auth.middleware";
+import { requireRole } from "../middleware/authorization.middleware";
 import { uploadSingle } from "../middleware/upload.middleware";
 import {
   validate,
@@ -64,6 +65,7 @@ router.put(
 
 router.post(
   "/:id/verify",
+  requireRole("staff", "admin"),
   validateParams(IdParamSchema),
   asyncHandler(async (req: ValidatedRequest<any>, res: Response) => {
     await documentController.verify(req, res);

@@ -64,9 +64,9 @@ Two things happen transparently via request-scoped context (`AsyncLocalStorage`)
 | [docs/api-standards.md](docs/api-standards.md) | Response envelope, versioning/mounting, status codes, pagination shape |
 | [docs/error-handling.md](docs/error-handling.md) | `ERROR_CODES` catalog, `AppError.fromCode`, the global error handler |
 | [docs/security.md](docs/security.md) | AuthN/AuthZ, sanitization, rate limiting, passwords, known gaps |
-| [docs/queue.md](docs/queue.md) | The custom Redis job queue — what's actually wired up (just `emails`) vs. scaffolding |
+| [docs/queue.md](docs/queue.md) | The custom Redis job queue — the `emails` queue, cron-driven sweeps, and what remains scaffolding |
 | [docs/logging.md](docs/logging.md) | winston conventions, structured log fields |
-| [docs/performance.md](docs/performance.md) | What's implemented vs. stubbed (`cache.middleware.ts` is an empty file) |
+| [docs/performance.md](docs/performance.md) | Response cache, rate limiters, what's implemented vs. stubbed |
 | [docs/testing.md](docs/testing.md) | Current state (none) and what to set up if you're adding the first tests |
 | [docs/deployment.md](docs/deployment.md) | Dockerfile/Compose/CI-CD pipeline in depth |
 | [docs/code-review.md](docs/code-review.md) | Project-specific review checklist, grounded in real bugs this codebase has shipped |
@@ -74,6 +74,6 @@ Two things happen transparently via request-scoped context (`AsyncLocalStorage`)
 
 ## The two things most worth internalizing before making changes
 
-1. **This codebase has a meaningful amount of scaffolded-but-unwired code**: `src/repositories/`, `src/interfaces/`, `src/events/`, `src/subscribers/`, most of `src/jobs/`, `src/validators/`, empty `cache.middleware.ts`/`rateLimit.middleware.ts` stubs, and `middleware/authorization.middleware.ts`'s `requireRole`/`requirePermission` (fully implemented, mounted on zero routes). None of these are wrong to build on if a task explicitly calls for it — but don't assume any of them are already load-bearing just because the file exists. [docs/folder-structure.md](docs/folder-structure.md) has the complete list; the other docs flag it inline wherever it's relevant to that topic.
+1. **This codebase has a meaningful amount of scaffolded-but-unwired code**: `src/repositories/`, `src/interfaces/`, `src/events/`, `src/subscribers/`, `src/validators/`, `jobs/report.job.ts` (all empty 0-byte files), and `requirePermission` (implemented, mounted on no routes; `requireRole` is used widely). None of these are wrong to build on if a task explicitly calls for it — but don't assume any of them are already load-bearing just because the file exists. [docs/folder-structure.md](docs/folder-structure.md) has the complete list; the other docs flag it inline wherever it's relevant to that topic.
 
 2. **Every Mongoose model with custom instance/static methods follows a typed-interface pattern** (`I<Model>` document interface + `I<Model>Model` statics interface, passed as `Schema<Doc, Model>`/`mongoose.model<Doc, Model>` generics) so TypeScript can see those methods from calling code. Skipping it doesn't error in the model file itself (an untyped schema's `this` is implicitly `any`), only at every call site elsewhere — this was the single largest source of TypeScript errors this codebase has accumulated historically, and reintroducing it silently breaks the build for someone else later. Full detail and a worked example: [docs/mongoose.md](docs/mongoose.md).

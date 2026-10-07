@@ -7,6 +7,7 @@ import {
   ValidatedRequest,
 } from "../middleware/validation.middleware";
 import { authenticate } from "../middleware/auth.middleware";
+import { requireRole } from "../middleware/authorization.middleware";
 import { uploadSingle } from "../middleware/upload.middleware";
 import {
   CreateServiceRecordSchema,
@@ -99,6 +100,7 @@ router.get(
 
 router.post(
   "/:id/parts",
+  requireRole("staff", "admin"),
   validateParams(IdParamSchema),
   validate(AddPartSchema),
   asyncHandler(async (req: ValidatedRequest<any>, res: Response) => {
@@ -108,6 +110,7 @@ router.post(
 
 router.put(
   "/:id/parts/:partId",
+  requireRole("staff", "admin"),
   validateParams(IdAndPartIdParamSchema),
   validate(UpdatePartSchema),
   asyncHandler(async (req: ValidatedRequest<any>, res: Response) => {
@@ -117,6 +120,7 @@ router.put(
 
 router.delete(
   "/:id/parts/:partId",
+  requireRole("staff", "admin"),
   validateParams(IdAndPartIdParamSchema),
   asyncHandler(async (req: ValidatedRequest<any>, res: Response) => {
     await serviceRecordController.removePart(req, res);
@@ -133,6 +137,7 @@ router.get(
 
 router.post(
   "/:id/labor",
+  requireRole("staff", "admin"),
   validateParams(IdParamSchema),
   validate(AddLaborSchema),
   asyncHandler(async (req: ValidatedRequest<any>, res: Response) => {
@@ -176,6 +181,7 @@ router.get(
 
 router.post(
   "/:id/invoice/generate",
+  requireRole("staff", "admin"),
   validateParams(IdParamSchema),
   validate(GenerateInvoiceSchema),
   asyncHandler(async (req: ValidatedRequest<any>, res: Response) => {
@@ -193,6 +199,7 @@ router.get(
 
 router.patch(
   "/:id/status",
+  requireRole("staff", "admin"),
   validateParams(IdParamSchema),
   validate(UpdateStatusSchema),
   asyncHandler(async (req: ValidatedRequest<any>, res: Response) => {

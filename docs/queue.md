@@ -18,11 +18,20 @@ await addJob("emails", { type: "welcome_email", data: { accountId, email } });
 
 The `type` must match a key in whatever handlers object the target queue registered (`emailHandlers` for the `"emails"` queue).
 
+## Scheduled (cron) jobs
+
+`jobs/scheduler.ts` (`startScheduledJobs()`, started from `workers/index.ts`) runs `node-cron` sweeps that are cross-tenant by design (no request context). Delivery goes through the `"emails"` queue via the `notification_email` handler in `jobs/notification.job.ts`:
+
+| Schedule | Job | File |
+|---|---|---|
+| every 15 min | due/overdue vehicle reminders | `reminder.job.ts` |
+| daily 06:00 | subscriptions expiring within 7 days | `subscription.job.ts` |
+| daily 07:00 | mark past-due invoices `overdue` + notify | `invoice.job.ts` |
+| daily 03:30 | archive notifications older than 90 days | `cleanup.job.ts` |
+
 ## What's *not* wired up
 
-Only the `"emails"` queue + `jobs/email.job.ts` are live. The rest of `src/jobs/` — `cleanup.job.ts`, `invoice.job.ts`, `notification.job.ts`, `reminder.job.ts`, `report.job.ts` — exist as handler modules but **no queue is created for them and `workers/index.ts` never registers them**. Similarly, `src/events/` (emitters + handlers) and `src/subscribers/` (an event-driven audit/notification dispatch pattern, by the look of the file names) are present but nothing imports them — there's no event bus instantiated anywhere.
-
-If a task calls for, say, "queue an invoice job when a payment completes," that requires actually wiring it up end to end (create the queue in `workers/index.ts` or wherever appropriate, register `invoice.job.ts`'s handlers, and call `addJob(...)` from the relevant service) — there's no partial plumbing to just plug into.
+`jobs/report.job.ts` and `jobs/index.ts` are empty, as are `src/events/`, `src/subscribers/`, `src/repositories/`, `src/interfaces/` and `src/validators/` — there is no event bus and nothing imports them.
 
 ## Adding a new job type to the existing `emails` queue
 

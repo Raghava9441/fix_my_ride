@@ -1,6 +1,7 @@
 import { Router, Request, Response, NextFunction } from "express";
 import { asyncHandler, createSuccessResponse, HttpStatus } from "../utils";
 import { authenticate } from "../middleware/auth.middleware";
+import { loginRateLimiter, sensitiveActionRateLimiter } from "../middleware/rateLimit.middleware";
 import authService, { NotifyFn } from "../services/auth.service";
 import { AppError } from "../utils/appError";
 import { ERROR_CODES } from "../constants/errors";
@@ -50,6 +51,7 @@ router.post(
 
 router.post(
   "/login",
+  loginRateLimiter,
   asyncHandler(async (req: Request, res: Response) => {
     try {
       const { account, tokens } = await authService.login({
@@ -129,6 +131,7 @@ router.post(
 
 router.post(
   "/forgot-password",
+  sensitiveActionRateLimiter,
   asyncHandler(async (req: Request, res: Response) => {
     await authService.forgotPassword({ email: req.body.email, notify });
     // Always success to avoid enumeration
@@ -140,6 +143,7 @@ router.post(
 
 router.post(
   "/reset-password",
+  sensitiveActionRateLimiter,
   asyncHandler(async (req: Request, res: Response) => {
     await authService.resetPassword({ token: req.body.token, password: req.body.password });
     res
@@ -160,6 +164,7 @@ router.get(
 
 router.post(
   "/resend-verification",
+  sensitiveActionRateLimiter,
   asyncHandler(async (req: Request, res: Response) => {
     await authService.resendVerification({ email: req.body.email, notify });
     res

@@ -1,4 +1,5 @@
 import os from "os";
+import mongoose from "mongoose";
 import fs from "fs/promises";
 import path from "path";
 import { monitorEventLoopDelay } from "perf_hooks";
@@ -169,6 +170,33 @@ export class AdminService {
     }
 
     return { path: outDir, createdAt: new Date().toISOString() };
+  }
+
+  /**
+   * "Search" in this codebase is MongoDB indexes (including text indexes) —
+   * there is no external search engine. Reindexing builds any index declared
+   * in a schema that is missing from the database. Non-destructive: indexes
+   * that exist in the DB but not in the schema are left alone.
+   */
+  async reindexSearch(): Promise<{
+    models: number;
+    succeeded: string[];
+    failed: { model: string; error: string }[];
+  }> {
+    const succeeded: string[] = [];
+    const failed: { model: string; error: string }[] = [];
+
+    for (const [name, model] of Object.entries(mongoose.models)) {
+      try {
+        await model.createIndexes();
+        succeeded.push(name);
+      } catch (err) {
+        logger.error({ type: "reindex_failed", model: name, error: (err as Error).message });
+        failed.push({ model: name, error: (err as Error).message });
+      }
+    }
+
+    return { models: succeeded.length + failed.length, succeeded, failed };
   }
 }
 

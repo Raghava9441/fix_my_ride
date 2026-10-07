@@ -199,9 +199,9 @@ registry.registerPath({
   method: "post",
   path: "/api/v1/admin/maintenance/reindex-search",
   tags: TAGS,
-  summary: "Rebuild search index (not implemented — no search index exists)",
+  summary: "Rebuild database indexes (creates any schema-declared index missing from MongoDB, including text indexes)",
   security: BEARER_AUTH,
-  responses: { 501: { description: "Not implemented" }, ...adminErrors() },
+  responses: { 200: { description: "Indexes rebuilt" }, ...adminErrors() },
 });
 
 registry.registerPath({

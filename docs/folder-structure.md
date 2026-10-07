@@ -19,7 +19,7 @@ src/
 ├── validators/             Unused — superseded by utils/validators.ts + the Zod DTOs in dto/. See below.
 ├── scripts/                One-off CLI scripts (migrate, backup, monitor) run via ts-node, not part of the server process
 ├── workers/                Background worker bootstrap — only wires up the `emails` queue today
-├── jobs/                   Job handlers; only email.job.ts is actually registered by workers/index.ts (see queue.md)
+├── jobs/                   Queue handlers (email, notification) plus cron sweeps run by scheduler.ts (see queue.md)
 ├── events/, subscribers/   Event emitter/handler/subscriber scaffolding — NOT wired into anything, dead code today
 ├── repositories/           Repository classes — NOT used by any service today, dead code
 ├── interfaces/             Repository/service interfaces — NOT implemented/used today, dead code
@@ -45,8 +45,7 @@ Several directories exist in the tree but nothing imports them at runtime. Don't
 | `src/repositories/`, `src/interfaces/repositories/` | Unused — services call Mongoose models directly, no repository layer in practice |
 | `src/interfaces/services/` | Unused |
 | `src/events/emitters/`, `src/events/handlers/`, `src/subscribers/` | Unused — no event bus is wired up |
-| `src/jobs/cleanup.job.ts`, `invoice.job.ts`, `notification.job.ts`, `reminder.job.ts`, `report.job.ts` | Unused — only `email.job.ts` is registered by `workers/index.ts` |
-| `src/middleware/cache.middleware.ts`, `src/middleware/rateLimit.middleware.ts` | Empty stub files (0 bytes) |
+| `src/jobs/report.job.ts`, `src/jobs/index.ts`, `src/scripts/*.ts` | Empty (0-byte) files |
 | `src/validators/` | Unused — request validation actually happens via the Zod schemas in `src/dto/` |
 | `src/middleware/authorization.middleware.ts` (`requireRole`/`requirePermission`/`requireTenant`) | Fully implemented but not mounted on any route — see [rbac.md](rbac.md) |
 

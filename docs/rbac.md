@@ -16,13 +16,13 @@ Two independent permission mechanisms exist in the codebase. Only one of them is
 
 **None of this is invoked by a route-level middleware today.** It's called explicitly, ad hoc, from inside individual services/controllers wherever the author remembered to add the check. When adding a new endpoint that touches another user's data, you need to call the relevant `.can()`/`.ownsResource()` yourself — there's no framework-level guarantee that it happens.
 
-## 2. `middleware/authorization.middleware.ts` (implemented, but unused — 0 routes reference it)
+## 2. `middleware/authorization.middleware.ts` (JWT-claim gating, applied per route)
 
 - `requireRole(...roles)` — checks `req.user.roles` (JWT claim) against an allow-list, throws `INSUFFICIENT_ROLE` otherwise.
 - `requirePermission(...permissions)` — checks `req.user.permissions` (also a JWT claim, so it reflects whatever was baked into the token at login, not a live DB lookup) against a required set, throws `FORBIDDEN` for any missing.
 - `requireTenant` — checks the requester belongs to the tenant referenced by `req.params.tenantId`/`req.body.tenantId` (admins bypass).
 
-This exists and is fully written, but grep confirms it's not imported by any route file. If a task is "lock down endpoint X," the two real options are: (a) call the appropriate model-level `.can()` from inside the service/controller (consistent with current live behavior), or (b) actually wire `requirePermission()`/`requireRole()` into that route (a genuine improvement, just not the status quo — flag it as an intentional change rather than assuming it was already the pattern).
+`requireRole` is used on admin, audit, account, role/permission, subscription(-plan), tenant, payment, invoice and service-center routes, and on staff-only actions: service-record parts/labor/status/invoice-generation, document verification, and `/reports/admin/*`. Caveat: the `owner` role is used both for vehicle owners (self-registration) and tenant owners (onboarding), so `owner` cannot be used to tell them apart — routes that need that distinction still rely on service-level checks. `requirePermission` is implemented but mounted on no routes yet.
 
 ## Practical guidance
 

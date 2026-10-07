@@ -1,6 +1,7 @@
 import { Router, Request, Response } from "express";
 import { asyncHandler } from "../utils";
 import { authenticate } from "../middleware/auth.middleware";
+import { requireRole } from "../middleware/authorization.middleware";
 import { validate, ValidatedRequest } from "../middleware/validation.middleware";
 import { ExportReportSchema } from "../dto/report.dto";
 import { ReportController } from "../controllers/report.controller";
@@ -47,19 +48,19 @@ router.get("/owner/upcoming-services", asyncHandler(async (req: Request, res: Re
 router.get("/owner/maintenance-summary", asyncHandler(async (req: Request, res: Response) => {
   await reportController.getMaintenanceSummary(req, res);
 }));
-router.get("/admin/tenants", asyncHandler(async (req: Request, res: Response) => {
+router.get("/admin/tenants", requireRole("admin"), asyncHandler(async (req: Request, res: Response) => {
   await reportController.getTenantsReport(req, res);
 }));
-router.get("/admin/revenue", asyncHandler(async (req: Request, res: Response) => {
+router.get("/admin/revenue", requireRole("admin"), asyncHandler(async (req: Request, res: Response) => {
   await reportController.getSaaSRevenue(req, res);
 }));
-router.get("/admin/growth", asyncHandler(async (req: Request, res: Response) => {
+router.get("/admin/growth", requireRole("admin"), asyncHandler(async (req: Request, res: Response) => {
   await reportController.getGrowthMetrics(req, res);
 }));
-router.get("/admin/retention", asyncHandler(async (req: Request, res: Response) => {
+router.get("/admin/retention", requireRole("admin"), asyncHandler(async (req: Request, res: Response) => {
   await reportController.getRetentionReport(req, res);
 }));
-router.get("/admin/churn", asyncHandler(async (req: Request, res: Response) => {
+router.get("/admin/churn", requireRole("admin"), asyncHandler(async (req: Request, res: Response) => {
   await reportController.getChurnReport(req, res);
 }));
 router.post(

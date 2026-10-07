@@ -274,11 +274,9 @@ export class AdminController {
   }
 
   async reindexSearch(req: Request, res: Response) {
-    const error = createErrorResponse(
-      "Not implemented — no search index (Elasticsearch/Algolia/etc.) exists in this codebase",
-      HttpStatus.NOT_IMPLEMENTED,
-    );
-    return res.status(error.statusCode).json(error.toJSON());
+    const result = await this.adminService.reindexSearch();
+    const response = createSuccessResponse(result, "Indexes rebuilt successfully");
+    return res.status(response.statusCode).json(response.toJSON());
   }
 
   async createBackup(req: Request, res: Response) {

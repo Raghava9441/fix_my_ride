@@ -9,8 +9,8 @@
 
 ## What's *not* in place (don't assume otherwise)
 
-- **`middleware/cache.middleware.ts` is an empty file (0 bytes).** There is no response/query caching layer today. Redis is used for token revocation and the job queue only (see [queue.md](queue.md), [security.md](security.md)) — not as a cache.
-- **`middleware/rateLimit.middleware.ts` is also an empty stub.** Rate limiting is real, but lives entirely in `config/rate-limit.ts` + a direct `express-rate-limit(...)` call in `app.ts` — see [security.md](security.md).
+- **`middleware/cache.middleware.ts` is a Redis-backed response cache** (keys under `cache:*`, covered by `cache.middleware.test.ts`). It is opt-in per route — currently used by `subscriptionPlan.routes.ts` — not applied globally. Admin `POST /admin/maintenance/clear-cache` clears `cache:*` by default.
+- **Rate limiting has two layers:** the global `/api` limiter (`config/rate-limit.ts`, applied in `app.ts`) and per-route limiters from `middleware/rateLimit.middleware.ts` (`createRateLimiter`, `loginRateLimiter`, `sensitiveActionRateLimiter`) — see [security.md](security.md).
 - No background pre-warming, CDN, or read-replica routing exists. `readPreference: "primaryPreferred"` is set on the Mongo connection (`config/database.ts`), which is as close as it gets today.
 
 If a task calls for adding caching, it needs to be built from scratch (Redis is already connected and available via `config/redis.ts`'s `getRedisClient()`) — there's no partial implementation to extend.

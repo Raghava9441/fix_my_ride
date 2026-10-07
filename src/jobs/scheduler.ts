@@ -2,6 +2,8 @@
 import cron, { ScheduledTask } from "node-cron";
 import { checkReminders } from "./reminder.job";
 import { checkExpiringSubscriptions } from "./subscription.job";
+import { markOverdueInvoices } from "./invoice.job";
+import { runCleanup } from "./cleanup.job";
 import { logger } from "../config/logger";
 
 let tasks: ScheduledTask[] = [];
@@ -26,10 +28,27 @@ export function startScheduledJobs(): void {
     );
   });
 
-  tasks = [reminderTask, subscriptionTask];
+  const invoiceTask = cron.schedule("0 7 * * *", () => {
+    void markOverdueInvoices().catch((err) =>
+      logger.error({ type: "invoice_overdue_job_failed", error: (err as Error).message }),
+    );
+  });
+
+  const cleanupTask = cron.schedule("30 3 * * *", () => {
+    void runCleanup().catch((err) =>
+      logger.error({ type: "cleanup_job_failed", error: (err as Error).message }),
+    );
+  });
+
+  tasks = [reminderTask, subscriptionTask, invoiceTask, cleanupTask];
   logger.info({
     type: "scheduled_jobs_bootstrapped",
-    jobs: ["reminder_check (*/15 * * * *)", "subscription_expiry_check (0 6 * * *)"],
+    jobs: [
+      "reminder_check (*/15 * * * *)",
+      "subscription_expiry_check (0 6 * * *)",
+      "invoice_overdue_check (0 7 * * *)",
+      "cleanup (30 3 * * *)",
+    ],
   });
 }
 
