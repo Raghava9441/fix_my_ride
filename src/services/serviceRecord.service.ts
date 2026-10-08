@@ -8,6 +8,7 @@ import mongoose from "mongoose";
 import { notificationService } from "./notification.service";
 import { logger } from "../config/logger";
 import { refreshOwnerStats } from "./ownerStats";
+import { refreshStaffStats } from "./staffStats";
 
 type RecordStatus = "scheduled" | "in_progress" | "completed" | "cancelled";
 
@@ -124,6 +125,16 @@ export interface FeedbackInput {
 }
 
 export interface UpdateServiceRecordInput {
+  /**
+   * Reassigns the job to a different technician.
+   *
+   * `UpdateServiceRecordSchema` has always accepted this and the value was
+   * spread straight through to Mongoose, so the endpoint worked — it just
+   * wasn't in the type, which meant nothing downstream could react to a
+   * reassignment. Declaring it is what lets the staff counters be corrected
+   * for both technicians.
+   */
+  technicianId?: string;
   serviceDate?: Date;
   serviceType?:
     | "oil_change"
@@ -362,7 +373,10 @@ export class ServiceRecordService {
     // A new job changes both the owner's service count and their lifetime
     // spend, and the customer list reads those counters rather than
     // recounting per row.
-    await refreshOwnerStats(record.ownerId, "service record create");
+    await Promise.all([
+      refreshOwnerStats(record.ownerId, "service record create"),
+      refreshStaffStats(record.technicianId, "service record create"),
+    ]);
 
     return record;
   }
@@ -372,6 +386,18 @@ export class ServiceRecordService {
     updates: UpdateServiceRecordInput,
   ): Promise<any | null> {
     const updateObj: any = { ...updates };
+
+    /*
+     * The technician before this edit, captured while it is still readable.
+     *
+     * `technicianId` is reassignable, and moving a job between technicians
+     * changes two people's totals — the one gaining it and the one losing
+     * it. Reading it after `findByIdAndUpdate` would return the new value
+     * and leave the previous technician's counters permanently overstated.
+     */
+    const previousTechnicianId = updates.technicianId
+      ? (await ServiceRecord.findById(id).select("technicianId"))?.technicianId
+      : undefined;
 
     if (updates.cost) {
       const existing = await ServiceRecord.findById(id);
@@ -408,12 +434,34 @@ export class ServiceRecordService {
       .populate("vehicleId", "registrationNumber make model")
       .populate("serviceCenterId", "name");
 
-    // Only a cost change moves the owner's totals. Parts and labour edits
-    // route through here too (`addLabor` re-derives `cost.laborTotal` and
-    // calls update), so this one hook covers every path that can change what
-    // a customer has spent.
-    if (record && updates.cost) {
-      await refreshOwnerStats(record.ownerId, "service record cost update");
+    if (record) {
+      // A cost change moves the customer's lifetime spend, and both a cost
+      // change and a reassignment move a technician's. Parts and labour
+      // edits route through here too — `addLabor` re-derives
+      // `cost.laborTotal` and calls update — so this covers every path that
+      // can change either figure.
+      const refreshes: Promise<void>[] = [];
+
+      if (updates.cost) {
+        refreshes.push(refreshOwnerStats(record.ownerId, "service record cost update"));
+      }
+
+      if (updates.cost || updates.technicianId) {
+        refreshes.push(refreshStaffStats(record.technicianId, "service record update"));
+      }
+
+      // Only when the job actually moved, not merely when the field was sent
+      // with the value it already had.
+      if (
+        previousTechnicianId &&
+        previousTechnicianId.toString() !== record.technicianId?.toString()
+      ) {
+        refreshes.push(
+          refreshStaffStats(previousTechnicianId, "service record reassigned away"),
+        );
+      }
+
+      await Promise.all(refreshes);
     }
 
     return record;
@@ -495,7 +543,10 @@ export class ServiceRecordService {
     // The filter is `isDeleted: false`, so a second delete of the same record
     // returns null and correctly skips the recompute rather than redoing it.
     if (record) {
-      await refreshOwnerStats(record.ownerId, "service record delete");
+      await Promise.all([
+        refreshOwnerStats(record.ownerId, "service record delete"),
+        refreshStaffStats(record.technicianId, "service record delete"),
+      ]);
     }
 
     return record;

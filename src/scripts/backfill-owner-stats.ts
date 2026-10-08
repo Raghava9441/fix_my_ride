@@ -1,6 +1,6 @@
 // src/scripts/backfill-owner-stats.ts
 /**
- * Recomputes `OwnerProfile.stats` for every customer.
+ * Recomputes `OwnerProfile.stats` and `StaffProfile.stats` for everyone.
  *
  * Usage: npm run backfill:owner-stats [-- --dry-run]
  *
@@ -19,7 +19,9 @@ import { connectDatabase, disconnectDatabase } from "../config/database";
 import { OwnerProfile } from "../models/OwnerProfile";
 import { Vehicle } from "../models/Vehicle";
 import { ServiceRecord } from "../models/ServiceRecord";
+import { StaffProfile } from "../models/StaffProfile";
 import { recomputeOwnerStats } from "../services/ownerStats";
+import { recomputeStaffStats } from "../services/staffStats";
 
 interface Counts {
   totalVehicles: number;
@@ -83,8 +85,54 @@ const main = async () => {
   }
 
   console.log(
-    `\n   ${changed} profile(s) ${dryRun ? "would be" : "were"} corrected, ` +
+    `\n   ${changed} customer profile(s) ${dryRun ? "would be" : "were"} corrected, ` +
       `${owners.length - changed} already accurate.\n`,
+  );
+
+  /* ---------------- staff ---------------- */
+
+  const staff = await StaffProfile.find({}, { _id: 1, employeeId: 1, stats: 1 });
+  console.log(`   ${staff.length} staff profile(s) found\n`);
+
+  let staffChanged = 0;
+
+  for (const member of staff) {
+    const id = member._id as mongoose.Types.ObjectId;
+
+    const [totals] = await ServiceRecord.aggregate([
+      { $match: { technicianId: id, isDeleted: false } },
+      {
+        $group: {
+          _id: null,
+          totalServicesPerformed: { $sum: 1 },
+          totalRevenueGenerated: { $sum: "$cost.total" },
+        },
+      },
+    ]);
+
+    const next = {
+      jobs: totals?.totalServicesPerformed || 0,
+      revenue: totals?.totalRevenueGenerated || 0,
+    };
+    const prev = {
+      jobs: member.stats?.totalServicesPerformed ?? 0,
+      revenue: member.stats?.totalRevenueGenerated ?? 0,
+    };
+
+    if (prev.jobs === next.jobs && prev.revenue === next.revenue) continue;
+
+    staffChanged++;
+    console.log(
+      `   ${member.employeeId || String(member._id)}: ` +
+        `jobs ${prev.jobs}→${next.jobs}, revenue ${prev.revenue}→${next.revenue}`,
+    );
+
+    if (!dryRun) await recomputeStaffStats(id);
+  }
+
+  console.log(
+    `\n   ${staffChanged} staff profile(s) ${dryRun ? "would be" : "were"} corrected, ` +
+      `${staff.length - staffChanged} already accurate.\n`,
   );
 
   await disconnectDatabase();

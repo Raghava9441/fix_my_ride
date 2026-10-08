@@ -1,4 +1,5 @@
 import { StaffProfile } from "../models/StaffProfile";
+import { recomputeStaffStats } from "./staffStats";
 import { Role } from "../models/Role";
 import { ServiceCenter } from "../models/ServiceCenter";
 import mongoose from "mongoose";
@@ -377,21 +378,27 @@ export class StaffProfileService {
     };
   }
 
-  async updateStats(
-    staffId: string,
-    servicesPerformed: number = 0,
-    revenueGenerated: number = 0,
-  ): Promise<any> {
+  /**
+   * Recomputes this member's counters and returns the updated profile.
+   *
+   * Previously took deltas and added them, which nothing ever called. An
+   * incremental counter cannot be told apart from a drifted one, so the
+   * arithmetic now lives in `staffStats.ts` and derives every figure from
+   * the service records themselves. The service-record mutations call it
+   * directly; this stays as the way to force a refresh after a bulk import
+   * or a data repair, where no single mutation fired.
+   */
+  async updateStats(staffId: string): Promise<any> {
     const staff = await StaffProfile.findById(staffId);
     if (!staff) {
       throw new Error("Staff profile not found");
     }
 
-    staff.stats.totalServicesPerformed += servicesPerformed;
-    staff.stats.totalRevenueGenerated += revenueGenerated;
+    await recomputeStaffStats(staffId);
 
-    await staff.save();
-    return staff;
+    // Re-read: the recompute wrote through `updateOne`, so the in-memory
+    // copy still holds the old counters.
+    return StaffProfile.findById(staffId);
   }
 }
 
