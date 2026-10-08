@@ -1,0 +1,26 @@
+src/services/staffStats.ts
+  s_b7e1d198fc1e98::t_384bd47762a4e2 1-79
+src/scripts/backfill-owner-stats.ts
+  s_b7e1d198fc1e98::t_d1614fe80c7185 88,92-137
+  s_b7e1d198fc1e98::t_92404fc34b35fa 3,22,24
+src/services/serviceRecord.service.ts
+  s_b7e1d198fc1e98::t_05e804505dfc2a 11,128-137,376-379,390-401,437-464,546-549
+src/services/staff.service.ts
+  s_b7e1d198fc1e98::t_bb26bfdd4be06e 2,381-391,397,399-401
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "28a313b3383b4a2de8c462d36460f23844c32e55",
+  "prompts": {},
+  "sessions": {
+    "s_b7e1d198fc1e98": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "91cb1339-5a4e-4f2c-a5c4-99710e206f8c",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Raghava9441 <raghavendrareddybollapu556@gmail.com>"
+    }
+  }
+}
