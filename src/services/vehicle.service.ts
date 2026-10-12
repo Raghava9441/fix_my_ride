@@ -4,6 +4,7 @@ import { ServiceCenter } from "../models/ServiceCenter";
 import { ServiceRecord } from "../models/ServiceRecord";
 import { odometerReadingService } from "./odometerReading.service";
 import { escapeRegExp } from "../utils/string";
+import { refreshOwnerStats } from "./ownerStats";
 import mongoose from "mongoose";
 
 export interface CreateVehicleInput {
@@ -243,6 +244,8 @@ export class VehicleService {
       isDeleted: false,
     });
 
+    await refreshOwnerStats(vehicle.currentOwnerId, "vehicle create");
+
     return vehicle;
   }
 
@@ -301,6 +304,11 @@ export class VehicleService {
       { $set: { isDeleted: true, deletedAt: new Date() } },
       { new: true },
     );
+
+    // Null when it was already deleted, which correctly skips the recompute.
+    if (vehicle) {
+      await refreshOwnerStats(vehicle.currentOwnerId, "vehicle delete");
+    }
 
     return vehicle;
   }
@@ -492,6 +500,11 @@ export class VehicleService {
       throw new Error("New owner not found");
     }
 
+    // Captured before `currentOwnerId` is reassigned below: a transfer moves
+    // a vehicle off one customer as well as onto another, and the one losing
+    // it needs its count corrected just as much.
+    const previousOwnerId = vehicle.currentOwnerId;
+
     const currentOwnerIndex = vehicle.ownershipHistory.findIndex(
       (h) => !h.toDate,
     );
@@ -519,9 +532,18 @@ export class VehicleService {
         addedAt: new Date(),
         isPrimary: false,
       });
-      newOwner.stats.totalVehicles = newOwner.vehicles.length;
+      // `stats.totalVehicles` is deliberately not set from
+      // `newOwner.vehicles.length` here. That array is only maintained by
+      // this method and `ownerService.addVehicle`, so it undercounts every
+      // vehicle created through `vehicleService.create` — the recompute
+      // below derives the count from `currentOwnerId` instead.
       await newOwner.save();
     }
+
+    await Promise.all([
+      refreshOwnerStats(previousOwnerId, "vehicle transfer (previous owner)"),
+      refreshOwnerStats(newOwnerId, "vehicle transfer (new owner)"),
+    ]);
 
     return vehicle;
   }
