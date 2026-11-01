@@ -1,0 +1,14 @@
+pricing-test.js
+  h_3594bdeeba2d56 9-10
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "62962fdb64465c76cda437ce740abdc8024f26ea",
+  "prompts": {},
+  "humans": {
+    "h_3594bdeeba2d56": {
+      "author": "Raghava9441 <raghavendrareddybollapu556@gmail.com>"
+    }
+  }
+}
