@@ -6,6 +6,8 @@ import {
   UpdateServiceRecordInput,
 } from "../services/serviceRecord.service";
 import { DocumentService } from "../services/document.service";
+import { StaffProfile } from "../models/StaffProfile";
+import { InvalidTransitionError } from "../services/serviceRecordTransitions";
 import { StorageService } from "../services/storage.service";
 import { InvoiceService } from "../services/invoice.service";
 import {
@@ -511,9 +513,65 @@ export class ServiceRecordController {
     return res.status(HttpStatus.OK).send(buffer);
   }
 
+  /**
+   * The center a staff-side caller is allowed to act on: their own, or any
+   * for a platform admin. Returns `null` when they have none, so the caller
+   * can refuse rather than fall through to "everything".
+   */
+  private async callerCenter(req: Request): Promise<{ centerId: string | null; isAdmin: boolean }> {
+    const roles = req.user?.roles ?? (req.user?.role ? [req.user.role] : []);
+    const isAdmin = roles.includes("admin");
+    const staff = await StaffProfile.findByAccount(req.user!.id);
+    const raw = staff?.serviceCenterId as unknown as { _id?: unknown } | string | undefined;
+    const centerId = raw ? String(typeof raw === "object" && raw?._id ? raw._id : raw) : null;
+    return { centerId, isAdmin };
+  }
+
+  async getQueue(req: Request, res: Response) {
+    const { centerId, isAdmin } = await this.callerCenter(req);
+    const requested = typeof req.query.serviceCenterId === "string" ? req.query.serviceCenterId : undefined;
+
+    if (requested && !/^[0-9a-fA-F]{24}$/.test(requested)) {
+      const error = createErrorResponse("serviceCenterId must be a valid id", HttpStatus.BAD_REQUEST);
+      return res.status(error.statusCode).json(error.toJSON());
+    }
+    if (requested && !isAdmin && requested !== centerId) {
+      const error = createErrorResponse("You can only view your own service center's queue", HttpStatus.FORBIDDEN);
+      return res.status(error.statusCode).json(error.toJSON());
+    }
+
+    const target = isAdmin ? (requested ?? centerId) : centerId;
+    if (!target) {
+      const error = createErrorResponse(
+        "serviceCenterId is required (or call this as staff belonging to a center)",
+        HttpStatus.BAD_REQUEST,
+      );
+      return res.status(error.statusCode).json(error.toJSON());
+    }
+
+    const limit = req.query.limit ? parseInt(req.query.limit as string) || undefined : undefined;
+    const queue = await this.serviceRecordService.getQueue(target, { limit });
+    const response = createSuccessResponse(queue, "Service queue retrieved successfully");
+    return res.status(response.statusCode).json(response.toJSON());
+  }
+
   async updateStatus(req: ValidatedRequest<any>, res: Response) {
     const { id } = req.params;
     const { status } = req.validated;
+
+    // Staff may only move jobs at their own center. The route used to check
+    // the role and nothing else, so a technician at one workshop could
+    // complete, or cancel, another workshop's jobs by id.
+    const { centerId, isAdmin } = await this.callerCenter(req);
+    if (!isAdmin) {
+      const existing = await this.serviceRecordService.findById(id);
+      const jobCenter = existing?.serviceCenterId as unknown as { _id?: unknown } | string | undefined;
+      const jobCenterId = jobCenter ? String(typeof jobCenter === "object" && jobCenter?._id ? jobCenter._id : jobCenter) : null;
+      if (existing && (!centerId || jobCenterId !== centerId)) {
+        const error = createErrorResponse("You can only update jobs at your own service center", HttpStatus.FORBIDDEN);
+        return res.status(error.statusCode).json(error.toJSON());
+      }
+    }
 
     try {
       const record = await this.serviceRecordService.updateStatus(id, status);
@@ -529,6 +587,10 @@ export class ServiceRecordController {
           "Service record not found",
           HttpStatus.NOT_FOUND,
         );
+        return res.status(apiError.statusCode).json(apiError.toJSON());
+      }
+      if (error instanceof InvalidTransitionError) {
+        const apiError = createErrorResponse(error.message, HttpStatus.CONFLICT);
         return res.status(apiError.statusCode).json(apiError.toJSON());
       }
       throw error;

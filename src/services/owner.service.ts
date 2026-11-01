@@ -325,6 +325,7 @@ export class OwnerProfileService {
         $group: {
           _id: null,
           total: { $sum: "$cost.total" },
+          currency: { $first: "$cost.currency" },
           byServiceType: {
             $push: {
               serviceType: "$serviceType",
@@ -347,7 +348,9 @@ export class OwnerProfileService {
 
     return {
       total: result[0].total,
-      currency: "USD",
+      // From the records themselves: this was a hard-coded "USD", which
+      // labelled a rupee total with a dollar code.
+      currency: result[0].currency ?? "USD",
       breakdown,
     };
   }

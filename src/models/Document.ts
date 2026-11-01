@@ -223,7 +223,16 @@ documentSchema.index({ entityType: 1, entityId: 1, isDeleted: 1 });
 documentSchema.index({ documentType: 1, status: 1 });
 documentSchema.index({ tenantId: 1, createdAt: -1 });
 documentSchema.index({ tags: 1 });
-documentSchema.index({ validUntil: 1 }, { expireAfterSeconds: 0 });
+// NOT a TTL index. This used to be `{ expireAfterSeconds: 0 }`, which makes
+// MongoDB hard-delete a document the moment `validUntil` passes — so an
+// expired insurance or PUC certificate vanished instead of being flagged as
+// expired, and `findExpiringSoon` could never see anything past its date.
+// Existing deployments still carry the old TTL index until it is dropped:
+// run `npm run migrate:drop-document-ttl` (or
+// `db.documents.dropIndex("validUntil_1")`), after which Mongoose recreates
+// it as a plain index.
+documentSchema.index({ validUntil: 1 });
+documentSchema.index({ isVerified: 1, status: 1 });
 
 // Pre-save: Check expiry
 documentSchema.pre('save', function(next) {
@@ -256,6 +265,10 @@ documentSchema.methods.softDelete = async function(this: IDocument, deletedBy: s
 
 documentSchema.methods.isAccessibleBy = function(this: IDocument, accountId: string, role: string): boolean {
   if (this.isPublic) return true;
+  // The uploader can always read their own file. Without this, a document
+  // uploaded without an explicit allow-list was unreadable by the person who
+  // uploaded it.
+  if (this.accountId && this.accountId.toString() === accountId) return true;
   if (this.allowedAccounts.some((id) => id.toString() === accountId)) return true;
   if (this.allowedRoles.includes(role)) return true;
   return false;

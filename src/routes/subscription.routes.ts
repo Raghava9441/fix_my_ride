@@ -2,7 +2,7 @@ import { Router, Response } from "express";
 import { asyncHandler } from "../utils";
 import { validate, validateParams, ValidatedRequest } from "../middleware/validation.middleware";
 import { authenticate } from "../middleware/auth.middleware";
-import { requireRole } from "../middleware/authorization.middleware";
+import { requireWorkspaceAdmin } from "../middleware/authorization.middleware";
 import { IdParamSchema } from "../dto/common.dto";
 import { CreateSubscriptionSchema, CancelSubscriptionSchema } from "../dto/subscription.dto";
 import { SubscriptionController } from "../controllers/subscription.controller";
@@ -23,7 +23,7 @@ router.get(
 
 router.post(
   "/subscribe",
-  requireRole("owner"),
+  requireWorkspaceAdmin,
   validate(CreateSubscriptionSchema),
   asyncHandler(async (req: ValidatedRequest<any>, res: Response) => {
     await subscriptionController.subscribe(req, res);
@@ -32,7 +32,7 @@ router.post(
 
 router.post(
   "/:id/cancel",
-  requireRole("owner", "admin"),
+  requireWorkspaceAdmin,
   validateParams(IdParamSchema),
   validate(CancelSubscriptionSchema),
   asyncHandler(async (req: ValidatedRequest<any>, res: Response) => {

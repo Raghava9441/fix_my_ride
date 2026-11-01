@@ -4,6 +4,7 @@ import crypto from "crypto";
 import { Account } from "../models/Account";
 import { OwnerProfile } from "../models/OwnerProfile";
 import { Tenant } from "../models/Tenant";
+import { StaffProfile } from "../models/StaffProfile";
 import { config } from "../config/environment";
 import { getRedisClient } from "../config/redis";
 import { AppError } from "../utils/appError";
@@ -456,7 +457,21 @@ export const authService = {
     if (!account) {
       throw AppError.fromCode("NOT_FOUND", { message: "Account not found" });
     }
-    return account;
+
+    // `rbacRole` is not a field on Account: it is the slug of the Role on the
+    // account's staff profile (`tenant_admin`, `technician`, ...). Clients
+    // need it to tell a workspace owner from a customer - both carry the
+    // account role `owner` - and `staffProfileId` is a bare id here, so
+    // without this there was no way to find out short of a second request.
+    const json = account.toJSON() as Record<string, any>;
+    if (account.staffProfileId) {
+      const staff = await StaffProfile.findById(account.staffProfileId)
+        .select("roleId")
+        .populate("roleId", "slug");
+      const slug = (staff?.roleId as unknown as { slug?: string } | undefined)?.slug;
+      if (slug) json.rbacRole = slug;
+    }
+    return json;
   },
 
   /**

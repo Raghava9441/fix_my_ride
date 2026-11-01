@@ -188,6 +188,10 @@ export const auditLogger = (req: Request, res: Response, next: NextFunction): vo
           entityId: resolvedEntityId,
           ipAddress: req.ip,
           userAgent: req.get('user-agent'),
+          // Without these a refused attempt (403) and a successful one are
+          // indistinguishable in the trail: both read "DELETE <entity>".
+          statusCode: res.statusCode,
+          path: req.originalUrl.split('?')[0],
         })
         .catch((err) =>
           logger.error({ type: 'audit_persist_failed', error: (err as Error).message }),

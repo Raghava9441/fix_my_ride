@@ -227,3 +227,52 @@ export async function isTokenBlacklisted(
     return false;
   }
 }
+
+
+/* ------------------------------------------------------------------ */
+/* Suspended-account marker                                            */
+/* ------------------------------------------------------------------ */
+
+const SUSPENDED_PREFIX = "auth:suspended:";
+
+/** "15m" / "24h" / "7d" / "3600" -> seconds. Unparseable input falls back to a day. */
+export function durationToSeconds(value: string | number | undefined, fallback = 86_400): number {
+  if (typeof value === "number") return value > 0 ? Math.floor(value) : fallback;
+  const match = /^(\d+)\s*([smhd]?)$/i.exec((value ?? "").trim());
+  if (!match) return fallback;
+  const n = Number(match[1]);
+  const unit = (match[2] || "s").toLowerCase();
+  return n * ({ s: 1, m: 60, h: 3600, d: 86_400 } as Record<string, number>)[unit];
+}
+
+/**
+ * Marks an account suspended in Redis for as long as any access token issued
+ * before now could still be alive.
+ *
+ * Suspending only flipped `status` in Mongo, and `authenticate` never reads
+ * the account - it trusts the signed token. So a suspended user kept full
+ * access until their token expired (login and refresh do refuse them, but a
+ * token already in hand needs neither). This marker is what `authenticate`
+ * checks, and it is cleared on re-activation.
+ */
+export async function markUserSuspended(
+  redis: { set: (...args: any[]) => Promise<unknown> },
+  userId: string,
+  ttlSeconds: number,
+): Promise<void> {
+  await redis.set(`${SUSPENDED_PREFIX}${userId}`, "1", "EX", Math.max(1, ttlSeconds));
+}
+
+export async function clearUserSuspended(
+  redis: { del: (...args: any[]) => Promise<unknown> },
+  userId: string,
+): Promise<void> {
+  await redis.del(`${SUSPENDED_PREFIX}${userId}`);
+}
+
+export async function isUserSuspended(
+  redis: { get: (key: string) => Promise<string | null> },
+  userId: string,
+): Promise<boolean> {
+  return (await redis.get(`${SUSPENDED_PREFIX}${userId}`)) != null;
+}

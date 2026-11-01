@@ -2,7 +2,7 @@ import { Router, Response } from "express";
 import { asyncHandler } from "../utils";
 import { validate, ValidatedRequest } from "../middleware/validation.middleware";
 import { authenticate } from "../middleware/auth.middleware";
-import { requireRole } from "../middleware/authorization.middleware";
+import { requireWorkspaceAdmin } from "../middleware/authorization.middleware";
 import { UpdateMyTenantSchema } from "../dto/tenant.dto";
 import { TenantController } from "../controllers/tenant.controller";
 import { tenantService } from "../services/tenant.service";
@@ -22,7 +22,7 @@ router.get(
 
 router.patch(
   "/me",
-  requireRole("owner"),
+  requireWorkspaceAdmin,
   validate(UpdateMyTenantSchema),
   asyncHandler(async (req: ValidatedRequest<any>, res: Response) => {
     await tenantController.updateMine(req, res);

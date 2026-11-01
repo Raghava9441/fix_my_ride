@@ -23,6 +23,7 @@
         "clean": "rm -rf dist",
         "appsail:prepare": "npm run build && node scripts/prepare-appsail.js",
         "backfill:owner-stats": "ts-node src/scripts/backfill-owner-stats.ts",
+        "migrate:drop-document-ttl": "ts-node src/scripts/drop-document-ttl-index.ts",
         "seed:dev": "cross-env NODE_ENV=development SEED_SAMPLE_DATA=true ts-node src/seeds/run.ts",
         "seed:prod": "cross-env NODE_ENV=production ts-node src/seeds/run.ts",
         "migrate": "ts-node src/scripts/migrate.ts",

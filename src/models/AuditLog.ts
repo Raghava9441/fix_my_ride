@@ -5,7 +5,7 @@ import { tenantPlugin } from '../middleware/tenant/tenantPlugin';
 export interface IAuditLog extends Document {
   tenantId?: Types.ObjectId;
   actorId: Types.ObjectId;
-  actorRole?: 'owner' | 'staff' | 'admin' | 'system';
+  actorRole?: 'owner' | 'staff' | 'admin' | 'fleet_manager' | 'service_advisor' | 'system';
   actorEmail?: string;
   action: 'CREATE' | 'READ' | 'UPDATE' | 'DELETE' | 'LOGIN' | 'LOGOUT' | 'GRANT_ACCESS' | 'REVOKE_ACCESS';
   entityType: 'Vehicle' | 'ServiceRecord' | 'Account' | 'OwnerProfile' | 'StaffProfile' | 'ServiceCenter' | 'Tenant' | 'System';
@@ -17,6 +17,10 @@ export interface IAuditLog extends Document {
   }>;
   ipAddress?: string;
   userAgent?: string;
+  /** HTTP status the request ended with. Absent on entries written before it was recorded. */
+  statusCode?: number;
+  /** The request path, e.g. `/api/v1/admin/tenants/abc/approve`. */
+  path?: string;
   recordedAt: Date;
   createdAt: Date;
   updatedAt: Date;
@@ -35,7 +39,10 @@ const auditLogSchema = new Schema<IAuditLog, IAuditLogModel>({
   },
   actorRole: {
     type: String,
-    enum: ['owner', 'staff', 'admin', 'system']
+    // Every account role, not just three of them: an entry for a
+    // `fleet_manager` or `service_advisor` failed enum validation and was
+    // dropped (only logged), so those users' actions never reached the trail.
+    enum: ['owner', 'staff', 'admin', 'fleet_manager', 'service_advisor', 'system']
   },
   actorEmail: String,
 
@@ -62,6 +69,8 @@ const auditLogSchema = new Schema<IAuditLog, IAuditLogModel>({
   // Context
   ipAddress: String,
   userAgent: String,
+  statusCode: Number,
+  path: String,
 
   recordedAt: { type: Date, default: Date.now }
 

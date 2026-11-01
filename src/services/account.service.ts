@@ -27,6 +27,10 @@ export interface AccountFilters {
     limit?: number;
     status?: string;
     tenantId?: string;
+    /** Account role (`primaryRole`). */
+    role?: string;
+    /** Free text over email. */
+    q?: string;
 }
 
 export interface PaginatedResult<T> {
@@ -41,11 +45,19 @@ export interface PaginatedResult<T> {
 
 export class AccountService {
     async findAll(filters?: AccountFilters): Promise<PaginatedResult<IAccount>> {
-        const page = filters?.page || 1;
-        const limit = filters?.limit || 20;
+        const page = Math.max(1, filters?.page || 1);
+        const limit = Math.min(100, Math.max(1, filters?.limit || 20));
         const skip = (page - 1) * limit;
 
         const query: any = { isDeleted: false };
+
+        if (filters?.role) {
+            query.primaryRole = filters.role;
+        }
+
+        if (filters?.q?.trim()) {
+            query.email = new RegExp(filters.q.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
+        }
 
         if (filters?.tenantId) {
             query.tenantId = filters.tenantId;

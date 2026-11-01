@@ -2,7 +2,7 @@ import { Router, Request, Response } from "express";
 import { asyncHandler } from "../utils";
 import { validate, validateParams, ValidatedRequest } from "../middleware/validation.middleware";
 import { authenticate } from "../middleware/auth.middleware";
-import { requireRole } from "../middleware/authorization.middleware";
+import { requireStaffSide } from "../middleware/authorization.middleware";
 import { IdParamSchema } from "../dto/common.dto";
 import { CreateInvoiceSchema, VoidInvoiceSchema } from "../dto/invoice.dto";
 import { InvoiceController } from "../controllers/invoice.controller";
@@ -33,7 +33,7 @@ router.get(
 // self-service — an owner shouldn't be able to invoice themselves.
 router.post(
   "/",
-  requireRole("staff", "admin"),
+  requireStaffSide,
   validate(CreateInvoiceSchema),
   asyncHandler(async (req: ValidatedRequest<any>, res: Response) => {
     await invoiceController.create(req, res);
@@ -58,7 +58,7 @@ router.post(
 
 router.post(
   "/:id/send",
-  requireRole("staff", "admin"),
+  requireStaffSide,
   validateParams(IdParamSchema),
   asyncHandler(async (req: Request, res: Response) => {
     await invoiceController.markAsSent(req, res);
@@ -67,7 +67,7 @@ router.post(
 
 router.post(
   "/:id/void",
-  requireRole("staff", "admin"),
+  requireStaffSide,
   validateParams(IdParamSchema),
   validate(VoidInvoiceSchema),
   asyncHandler(async (req: ValidatedRequest<any>, res: Response) => {

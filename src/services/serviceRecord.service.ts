@@ -9,6 +9,7 @@ import { notificationService } from "./notification.service";
 import { logger } from "../config/logger";
 import { refreshOwnerStats } from "./ownerStats";
 import { refreshStaffStats } from "./staffStats";
+import { InvalidTransitionError, canTransition } from "./serviceRecordTransitions";
 
 type RecordStatus = "scheduled" | "in_progress" | "completed" | "cancelled";
 
@@ -556,8 +557,30 @@ export class ServiceRecordService {
     id: string,
     status: "scheduled" | "in_progress" | "completed" | "cancelled",
   ): Promise<any> {
+    const existing = await ServiceRecord.findOne({ _id: id, isDeleted: false });
+    if (!existing) {
+      throw new Error("Service record not found");
+    }
+
+    const from = existing.status as RecordStatus;
+
+    // Asking for the status it already has is a no-op, not an error and not a
+    // second set of side effects: a double-click, or a retried request after
+    // a slow response, must not complete a job twice.
+    if (from === status) {
+      return ServiceRecord.findById(id)
+        .populate("vehicleId")
+        .populate("serviceCenterId", "name");
+    }
+
+    if (!canTransition(from, status)) {
+      throw new InvalidTransitionError(from, status);
+    }
+
+    // The previous status is part of the filter, so two requests racing to
+    // complete the same job can't both win: the loser matches nothing.
     const record = await ServiceRecord.findOneAndUpdate(
-      { _id: id, isDeleted: false },
+      { _id: id, isDeleted: false, status: from },
       { $set: { status } },
       { new: true },
     )
@@ -565,7 +588,7 @@ export class ServiceRecordService {
       .populate("serviceCenterId", "name");
 
     if (!record) {
-      throw new Error("Service record not found");
+      throw new InvalidTransitionError(from, status);
     }
 
     if (status === "completed") {
@@ -591,23 +614,24 @@ export class ServiceRecordService {
         });
       }
 
-      if (record.technicianId) {
-        const staff = await StaffProfile.findById(record.technicianId);
-        if (staff) {
-          staff.stats.totalServicesPerformed += 1;
-          staff.stats.totalRevenueGenerated += record.cost.total;
-          await staff.save();
-        }
-      }
+      // Recomputed, not incremented. A job is already counted for its
+      // technician and owner the moment it is created, so adding one more on
+      // completion counted every finished job twice.
+      await Promise.all([
+        refreshStaffStats(record.technicianId, "service record complete"),
+        refreshOwnerStats(record.ownerId, "service record complete"),
+      ]);
 
-      const serviceCenter = await ServiceCenter.findById(
-        record.serviceCenterId,
+      // Reached once per job: `completed` is terminal and the update above is
+      // conditional on the previous status, so these can't be applied twice.
+      // `$inc`, not load-modify-save: that re-validated the whole center
+      // document, so an unrelated invalid field on the center (say a missing
+      // phone number) made completing any of its jobs fail after the status
+      // had already changed.
+      await ServiceCenter.updateOne(
+        { _id: record.serviceCenterId },
+        { $inc: { "stats.totalServiceRecords": 1, "stats.totalRevenue": record.cost?.total ?? 0 } },
       );
-      if (serviceCenter) {
-        serviceCenter.stats.totalServiceRecords += 1;
-        serviceCenter.stats.totalRevenue += record.cost.total;
-        await serviceCenter.save();
-      }
     }
 
     await notifyOwnerOfServiceUpdate(
@@ -618,6 +642,52 @@ export class ServiceRecordService {
     );
 
     return record;
+  }
+
+  /**
+   * The work board for one service center: what is booked, what is on the
+   * floor, and what finished today.
+   *
+   * One query per lane rather than one list the client slices, so each lane
+   * is correct and bounded on its own - a center with a long backlog of
+   * scheduled jobs can't push in-progress work off the page. Counts are the
+   * true totals even when a lane is truncated.
+   */
+  async getQueue(serviceCenterId: string, options: { limit?: number } = {}) {
+    const limit = Math.min(100, Math.max(1, options.limit ?? 50));
+    const center = new mongoose.Types.ObjectId(serviceCenterId);
+
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+
+    const base = { serviceCenterId: center, isDeleted: false };
+    const lane = (extra: Record<string, unknown>, sort: Record<string, 1 | -1>) =>
+      ServiceRecord.find({ ...base, ...extra })
+        .populate("vehicleId", "registrationNumber make model year")
+        .populate({
+          path: "technicianId",
+          select: "accountId",
+          populate: { path: "accountId", select: "email" },
+        })
+        .sort(sort)
+        .limit(limit);
+
+    const [scheduled, inProgress, completedToday, scheduledCount, inProgressCount, completedTodayCount] =
+      await Promise.all([
+        lane({ status: "scheduled" }, { serviceDate: 1 }),
+        lane({ status: "in_progress" }, { updatedAt: 1 }),
+        lane({ status: "completed", updatedAt: { $gte: startOfToday } }, { updatedAt: -1 }),
+        ServiceRecord.countDocuments({ ...base, status: "scheduled" }),
+        ServiceRecord.countDocuments({ ...base, status: "in_progress" }),
+        ServiceRecord.countDocuments({ ...base, status: "completed", updatedAt: { $gte: startOfToday } }),
+      ]);
+
+    return {
+      scheduled,
+      inProgress,
+      completedToday,
+      counts: { scheduled: scheduledCount, inProgress: inProgressCount, completedToday: completedTodayCount },
+    };
   }
 
   async getRevenueReport(
@@ -641,6 +711,7 @@ export class ServiceRecordService {
           totalServices: { $sum: 1 },
           partsTotal: { $sum: "$cost.partsTotal" },
           laborTotal: { $sum: "$cost.laborTotal" },
+          currency: { $first: "$cost.currency" },
         },
       },
       { $sort: { _id: 1 } },

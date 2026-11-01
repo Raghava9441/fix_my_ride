@@ -51,6 +51,7 @@ export class ReportService {
     return {
       daily,
       total: daily.reduce((sum: number, d: any) => sum + d.totalRevenue, 0),
+      currency: daily[0]?.currency,
     };
   }
 

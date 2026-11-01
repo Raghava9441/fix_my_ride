@@ -1,5 +1,23 @@
 import { Document } from "../models/Document";
+import { Vehicle } from "../models/Vehicle";
+import { ServiceCenter } from "../models/ServiceCenter";
+import { Invoice } from "../models/Invoice";
 import mongoose from "mongoose";
+
+const EXPIRING_SOON_DAYS = 30;
+const MAX_PAGE_SIZE = 100;
+
+const SORTABLE_FIELDS = new Set(["createdAt", "validUntil", "size", "originalName"]);
+
+const escapeRegex = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+/** `-createdAt` → `{ createdAt: -1 }`; anything not allow-listed falls back to newest first. */
+function parseSort(sort: string | undefined): Record<string, 1 | -1> {
+  if (!sort) return { createdAt: -1 };
+  const desc = sort.startsWith("-");
+  const field = desc ? sort.slice(1) : sort;
+  return SORTABLE_FIELDS.has(field) ? { [field]: desc ? -1 : 1 } : { createdAt: -1 };
+}
 
 export interface CreateDocumentInput {
   tenantId?: string;
@@ -60,6 +78,22 @@ export interface DocumentFilters {
   entityId?: string;
   documentType?: string;
   status?: string;
+  /** Free text over file name, description and tags. */
+  q?: string;
+  tags?: string[];
+  isVerified?: boolean;
+  /** `expired` = past `validUntil`; `expiring` = within the next 30 days. */
+  expiry?: "expired" | "expiring";
+  sort?: string;
+}
+
+export interface DocumentStats {
+  total: number;
+  totalBytes: number;
+  unverified: number;
+  expired: number;
+  expiringSoon: number;
+  byType: Record<string, number>;
 }
 
 export interface PaginatedResult<T> {
@@ -74,8 +108,8 @@ export interface PaginatedResult<T> {
 
 export class DocumentService {
   async findAll(filters?: DocumentFilters): Promise<PaginatedResult<any>> {
-    const page = filters?.page || 1;
-    const limit = filters?.limit || 20;
+    const page = Math.max(1, filters?.page || 1);
+    const limit = Math.min(MAX_PAGE_SIZE, Math.max(1, filters?.limit || 20));
     const skip = (page - 1) * limit;
 
     const query: any = { isDeleted: false };
@@ -85,24 +119,140 @@ export class DocumentService {
     if (filters?.entityId) query.entityId = filters.entityId;
     if (filters?.documentType) query.documentType = filters.documentType;
     if (filters?.status) query.status = filters.status;
+    if (filters?.isVerified !== undefined) query.isVerified = filters.isVerified;
+    if (filters?.tags?.length) query.tags = { $in: filters.tags };
+
+    if (filters?.q?.trim()) {
+      const pattern = new RegExp(escapeRegex(filters.q.trim()), "i");
+      query.$or = [{ originalName: pattern }, { description: pattern }, { tags: pattern }];
+    }
+
+    // Expiry is read from `validUntil` directly. The stored `isExpired` flag
+    // is only recomputed on save, so it goes stale the day after a document
+    // is written and can't be trusted to filter on.
+    const now = new Date();
+    if (filters?.expiry === "expired") {
+      query.validUntil = { $lt: now };
+    } else if (filters?.expiry === "expiring") {
+      const cutoff = new Date(now);
+      cutoff.setDate(cutoff.getDate() + EXPIRING_SOON_DAYS);
+      query.validUntil = { $gte: now, $lte: cutoff };
+    }
 
     const [documents, total] = await Promise.all([
-      Document.find(query)
-        .populate("entityId", "name registrationNumber")
-        .skip(skip)
-        .limit(limit)
-        .sort({ createdAt: -1 }),
+      Document.find(query).sort(parseSort(filters?.sort)).skip(skip).limit(limit),
       Document.countDocuments(query),
     ]);
 
     return {
-      data: documents,
+      data: await this.withEntityLabels(documents),
       pagination: {
         page,
         limit,
         total,
         totalPages: Math.ceil(total / limit),
       },
+    };
+  }
+
+  /**
+   * Adds `entityLabel` ("MH12 AB 1234 · Honda City") so a list can say what a
+   * document is attached to without the client fetching every entity.
+   *
+   * Replaces a `.populate("entityId")` that could never have worked:
+   * `entityId` has no `ref` (it points at a different collection depending
+   * on `entityType`), so there was nothing for populate to resolve against.
+   * One batched lookup per entity type, and only for types that have a
+   * sensible display name — the rest simply get no label.
+   */
+  async withEntityLabels(documents: any[]): Promise<any[]> {
+    const idsByType = new Map<string, Set<string>>();
+    for (const doc of documents) {
+      const set = idsByType.get(doc.entityType) ?? new Set<string>();
+      set.add(String(doc.entityId));
+      idsByType.set(doc.entityType, set);
+    }
+
+    const labels = new Map<string, string>();
+    const key = (type: string, id: unknown) => `${type}:${String(id)}`;
+    const idsOf = (type: string) => [...(idsByType.get(type) ?? [])];
+
+    await Promise.all([
+      idsByType.has("vehicle")
+        ? Vehicle.find({ _id: { $in: idsOf("vehicle") } })
+            .select("registrationNumber make model")
+            .lean()
+            .then((rows: any[]) =>
+              rows.forEach((v) =>
+                labels.set(key("vehicle", v._id), `${v.registrationNumber} · ${v.make} ${v.model}`),
+              ),
+            )
+        : undefined,
+      idsByType.has("service_center")
+        ? ServiceCenter.find({ _id: { $in: idsOf("service_center") } })
+            .select("name")
+            .lean()
+            .then((rows: any[]) => rows.forEach((c) => labels.set(key("service_center", c._id), c.name)))
+        : undefined,
+      idsByType.has("invoice")
+        ? Invoice.find({ _id: { $in: idsOf("invoice") } })
+            .select("invoiceNumber")
+            .lean()
+            .then((rows: any[]) =>
+              rows.forEach((i) => labels.set(key("invoice", i._id), `Invoice ${i.invoiceNumber}`)),
+            )
+        : undefined,
+    ]);
+
+    const now = Date.now();
+    return documents.map((doc) => {
+      const plain = typeof doc.toObject === "function" ? doc.toObject() : doc;
+      return {
+        ...plain,
+        entityLabel: labels.get(key(doc.entityType, doc.entityId)),
+        // Derived on every read: the stored flag only updates on save.
+        isExpired: plain.validUntil ? new Date(plain.validUntil).getTime() < now : false,
+      };
+    });
+  }
+
+  async getStats(): Promise<DocumentStats> {
+    const now = new Date();
+    const cutoff = new Date(now);
+    cutoff.setDate(cutoff.getDate() + EXPIRING_SOON_DAYS);
+
+    const [totals, byType] = await Promise.all([
+      Document.aggregate([
+        { $match: { isDeleted: false, status: { $ne: "deleted" } } },
+        {
+          $group: {
+            _id: null,
+            total: { $sum: 1 },
+            totalBytes: { $sum: "$size" },
+            unverified: { $sum: { $cond: [{ $eq: ["$isVerified", false] }, 1, 0] } },
+            expired: {
+              $sum: { $cond: [{ $and: [{ $ne: [{ $type: "$validUntil" }, "missing"] }, { $lt: ["$validUntil", now] }] }, 1, 0] },
+            },
+            expiringSoon: {
+              $sum: { $cond: [{ $and: [{ $gte: ["$validUntil", now] }, { $lte: ["$validUntil", cutoff] }] }, 1, 0] },
+            },
+          },
+        },
+      ]),
+      Document.aggregate([
+        { $match: { isDeleted: false, status: { $ne: "deleted" } } },
+        { $group: { _id: "$documentType", count: { $sum: 1 } } },
+      ]),
+    ]);
+
+    const t = totals[0] ?? {};
+    return {
+      total: t.total ?? 0,
+      totalBytes: t.totalBytes ?? 0,
+      unverified: t.unverified ?? 0,
+      expired: t.expired ?? 0,
+      expiringSoon: t.expiringSoon ?? 0,
+      byType: Object.fromEntries(byType.map((row: any) => [row._id, row.count])),
     };
   }
 

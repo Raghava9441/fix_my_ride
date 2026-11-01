@@ -22,7 +22,7 @@ export const CreateTenantSchema = z.object({
       country: z.string().default("US"),
       postalCode: z.string().optional(),
       timezone: z.string().default("UTC"),
-      currency: z.enum(["USD", "eur", "gbp", "inr", "aed"]).default("USD"),
+      currency: z.enum(["USD", "EUR", "GBP", "INR", "AED"]).default("USD"),
     })
     .optional(),
   subscription: z
@@ -76,7 +76,7 @@ export const UpdateTenantSchema = z
         country: z.string().optional(),
         postalCode: z.string().optional(),
         timezone: z.string().optional(),
-        currency: z.enum(["USD", "eur", "gbp", "inr", "aed"]).optional(),
+        currency: z.enum(["USD", "EUR", "GBP", "INR", "AED"]).optional(),
       })
       .optional(),
     subscription: z
@@ -123,8 +123,10 @@ export const UpdateMyTenantSchema = z
   .object({
     name: z.string().min(1).max(100).optional(),
     description: z.string().optional(),
-    logoUrl: z.string().url().optional(),
-    website: z.string().url().optional(),
+    // An empty string clears the field; without it a website, once set,
+    // could never be removed (`""` is not a valid URL).
+    logoUrl: z.union([z.string().url(), z.literal("")]).optional(),
+    website: z.union([z.string().url(), z.literal("")]).optional(),
     contactEmail: z.string().email().optional(),
     contactPhone: z.string().optional(),
     address: z
@@ -135,7 +137,7 @@ export const UpdateMyTenantSchema = z
         country: z.string().optional(),
         postalCode: z.string().optional(),
         timezone: z.string().optional(),
-        currency: z.enum(["USD", "eur", "gbp", "inr", "aed"]).optional(),
+        currency: z.enum(["USD", "EUR", "GBP", "INR", "AED"]).optional(),
       })
       .optional(),
     settings: z

@@ -4,7 +4,7 @@ import mongoose from "mongoose";
 export interface CreateAuditLogInput {
   tenantId?: string;
   actorId: string;
-  actorRole: "owner" | "staff" | "admin" | "system";
+  actorRole: "owner" | "staff" | "admin" | "fleet_manager" | "service_advisor" | "system";
   actorEmail?: string;
   action:
     | "CREATE"
@@ -32,6 +32,8 @@ export interface CreateAuditLogInput {
   }>;
   ipAddress?: string;
   userAgent?: string;
+  statusCode?: number;
+  path?: string;
 }
 
 export interface AuditLogFilters {
@@ -58,8 +60,9 @@ export interface PaginatedResult<T> {
 
 export class AuditLogService {
   async findAll(filters?: AuditLogFilters): Promise<PaginatedResult<any>> {
-    const page = filters?.page || 1;
-    const limit = filters?.limit || 20;
+    const page = Math.max(1, filters?.page || 1);
+    // Capped: this was unbounded, so `?limit=1000000` pulled the whole trail.
+    const limit = Math.min(100, Math.max(1, filters?.limit || 20));
     const skip = (page - 1) * limit;
 
     const query: any = {};
@@ -142,6 +145,8 @@ export class AuditLogService {
       changes: input.changes || [],
       ipAddress: input.ipAddress,
       userAgent: input.userAgent,
+      statusCode: input.statusCode,
+      path: input.path,
       recordedAt: new Date(),
     });
 

@@ -1,7 +1,7 @@
 import { Router, Request, Response } from "express";
 import { asyncHandler } from "../utils";
 import { authenticate } from "../middleware/auth.middleware";
-import { requireRole } from "../middleware/authorization.middleware";
+import { requireStaffSide } from "../middleware/authorization.middleware";
 import { uploadSingle } from "../middleware/upload.middleware";
 import {
   validate,
@@ -21,7 +21,31 @@ const router = Router();
 
 const documentController = new DocumentController(documentService, storageService);
 
+// Registered before `authenticate`: the signed token in the URL is the
+// credential here, because a browser link cannot carry a bearer header.
+router.get(
+  "/download/:token",
+  asyncHandler(async (req: Request, res: Response) => {
+    await documentController.downloadByToken(req, res);
+  }),
+);
+
 router.use(authenticate);
+
+// Fixed paths first - `/:id` below would otherwise swallow them.
+router.get(
+  "/stats",
+  asyncHandler(async (req: Request, res: Response) => {
+    await documentController.getStats(req, res);
+  }),
+);
+
+router.get(
+  "/expiring",
+  asyncHandler(async (req: Request, res: Response) => {
+    await documentController.getExpiring(req, res);
+  }),
+);
 
 router.get(
   "/",
@@ -65,7 +89,7 @@ router.put(
 
 router.post(
   "/:id/verify",
-  requireRole("staff", "admin"),
+  requireStaffSide,
   validateParams(IdParamSchema),
   asyncHandler(async (req: ValidatedRequest<any>, res: Response) => {
     await documentController.verify(req, res);
@@ -77,6 +101,14 @@ router.post(
   validateParams(IdParamSchema),
   asyncHandler(async (req: ValidatedRequest<any>, res: Response) => {
     await documentController.archive(req, res);
+  }),
+);
+
+router.get(
+  "/:id/link",
+  validateParams(IdParamSchema),
+  asyncHandler(async (req: ValidatedRequest<any>, res: Response) => {
+    await documentController.createLink(req, res);
   }),
 );
 

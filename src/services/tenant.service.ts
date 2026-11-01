@@ -71,7 +71,13 @@ export interface UpdateTenantInput {
 export interface TenantFilters {
   page?: number;
   limit?: number;
+  /** Subscription status: trial | active | expired | suspended | cancelled. */
   status?: string;
+  /** Signup review state: pending_review | approved | rejected. */
+  approval?: string;
+  isActive?: boolean;
+  /** Free text over name, slug and contact email. */
+  q?: string;
 }
 
 export interface PaginatedResult<T> {
@@ -84,14 +90,41 @@ export interface PaginatedResult<T> {
   };
 }
 
+/**
+ * `{ address: { city: "x" }, name: "y" }` -> `{ "address.city": "x", name: "y" }`.
+ *
+ * Only plain objects are descended into; arrays, dates and ObjectIds are
+ * values and are kept whole.
+ */
+export function flattenForSet(input: Record<string, any>, prefix = ""): Record<string, any> {
+  const out: Record<string, any> = {};
+  for (const [key, value] of Object.entries(input)) {
+    if (value === undefined) continue;
+    const path = prefix ? `${prefix}.${key}` : key;
+    const plain =
+      value !== null &&
+      typeof value === "object" &&
+      Object.getPrototypeOf(value) === Object.prototype;
+    if (plain) Object.assign(out, flattenForSet(value, path));
+    else out[path] = value;
+  }
+  return out;
+}
+
 export class TenantService {
   async findAll(filters?: TenantFilters): Promise<PaginatedResult<any>> {
-    const page = filters?.page || 1;
-    const limit = filters?.limit || 20;
+    const page = Math.max(1, filters?.page || 1);
+    const limit = Math.min(100, Math.max(1, filters?.limit || 20));
     const skip = (page - 1) * limit;
 
     const query: any = { isDeleted: false };
     if (filters?.status) query["subscription.status"] = filters.status;
+    if (filters?.approval) query["onboarding.status"] = filters.approval;
+    if (filters?.isActive !== undefined) query.isActive = filters.isActive;
+    if (filters?.q?.trim()) {
+      const pattern = new RegExp(filters.q.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
+      query.$or = [{ name: pattern }, { slug: pattern }, { contactEmail: pattern }];
+    }
 
     const [tenants, total] = await Promise.all([
       Tenant.find(query)
@@ -199,7 +232,11 @@ export class TenantService {
   }
 
   async update(id: string, updates: UpdateTenantInput): Promise<any | null> {
-    const tenant = await Tenant.findByIdAndUpdate(id, updates, {
+    // Dotted paths, not nested objects. Handing Mongoose `{ address: { city } }`
+    // replaces the whole `address`, so renaming a city silently erased the
+    // street, country, timezone and currency; `{ "address.city": ... }` sets
+    // only the field that was sent.
+    const tenant = await Tenant.findByIdAndUpdate(id, { $set: flattenForSet(updates) }, {
       new: true,
       runValidators: true,
     })

@@ -15,6 +15,17 @@ const reportController = new ReportController(reportService, staffProfileService
 
 router.use(authenticate);
 
+/*
+ * There is deliberately no account-role gate on the center reports.
+ *
+ * "Owner" is overloaded in this system: the person who creates a workspace is
+ * given the account role `owner` (plus a staff profile), exactly like a
+ * customer. Gating on `staff`/`admin` would lock the workspace owner out of
+ * their own center's reports. Access is decided in the controller instead,
+ * from what actually matters: a staff profile at the requested center (or the
+ * admin role). A customer with no staff profile is refused there.
+ */
+
 router.get("/dashboard", asyncHandler(async (req: Request, res: Response) => {
   await reportController.getDashboard(req, res);
 }));

@@ -50,6 +50,7 @@ export const UploadDocumentSchema = z.object({
 
 export const UpdateDocumentSchema = z
   .object({
+    documentType: UploadDocumentSchema.shape.documentType.optional(),
     description: z.string().optional(),
     tags: z.array(z.string()).optional(),
     isPublic: z.boolean().optional(),

@@ -21,6 +21,31 @@ const execFileAsync = promisify(execFile);
 const eventLoopMonitor = monitorEventLoopDelay({ resolution: 20 });
 eventLoopMonitor.enable();
 
+/** How much of a log file to read: enough for the last few hundred lines. */
+const LOG_TAIL_BYTES = 1024 * 1024;
+
+/**
+ * Reads the last `maxBytes` of a file as text, starting on a whole line.
+ *
+ * The end of the file, not all of it: a production log runs to hundreds of
+ * megabytes, and reading it whole to keep the last 200 lines spiked the
+ * process's memory on every call.
+ */
+export async function readTail(filePath: string, maxBytes: number): Promise<string> {
+  const handle = await fs.open(filePath, "r");
+  try {
+    const { size } = await handle.stat();
+    const start = Math.max(0, size - maxBytes);
+    const buffer = Buffer.alloc(size - start);
+    await handle.read(buffer, 0, buffer.length, start);
+    const text = buffer.toString("utf-8");
+    // A tail that starts mid-file begins part-way through a line; drop it.
+    return start > 0 ? text.slice(text.indexOf("\n") + 1) : text;
+  } finally {
+    await handle.close();
+  }
+}
+
 export interface DashboardStats {
   totalTenants: number;
   totalUsers: number;
@@ -105,7 +130,7 @@ export class AdminService {
 
     let raw: string;
     try {
-      raw = await fs.readFile(filePath, "utf-8");
+      raw = await readTail(filePath, LOG_TAIL_BYTES);
     } catch (err) {
       if ((err as NodeJS.ErrnoException).code === "ENOENT") {
         return {

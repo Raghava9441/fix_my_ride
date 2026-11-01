@@ -1,7 +1,7 @@
 // src/middleware/auth.middleware.ts
 import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
-import { verifyToken, isTokenBlacklisted } from "../utils/token";
+import { verifyToken, isTokenBlacklisted, isUserSuspended } from "../utils/token";
 import { config } from "../config/environment";
 import { getRedisClient } from "../config/redis";
 import { AppError } from "../utils/appError";
@@ -48,6 +48,11 @@ async function verifyAccessToken(token: string, correlationId?: string) {
     const revoked = await isTokenBlacklisted(token, { getRedis: getRedisClient });
     if (revoked) {
       throw AppError.fromCode("TOKEN_REVOKED", { correlationId });
+    }
+
+    // An admin suspended this account after the token was issued.
+    if (await isUserSuspended(getRedisClient(), decoded.userId)) {
+      throw AppError.fromCode("ACCOUNT_SUSPENDED", { correlationId });
     }
   } catch (err) {
     if (err instanceof AppError) throw err;
