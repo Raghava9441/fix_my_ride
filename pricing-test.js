@@ -6,6 +6,8 @@ function calculatePrice(basePrice, quantity = 1, discountPercent = 0, taxPercent
   return Math.round(total * 100) / 100;
 }
 
+
+
 console.assert(calculatePrice(100) === 100, "base price");
 console.assert(calculatePrice(50, 2) === 100, "quantity");
 console.assert(calculatePrice(100, 1, 10) === 90, "discount");
