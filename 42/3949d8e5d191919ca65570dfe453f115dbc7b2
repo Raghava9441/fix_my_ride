@@ -1,0 +1,110 @@
+src/services/document.service.ts
+  s_5e7bf892df2031::t_3c25463089ab08 12
+  s_5e7bf892df2031::t_b1648675e67fcd 2-4,7-11,13-21,81-96,111-112,122-140,143,148,158-258
+src/middleware/auth.suspended.test.ts
+  s_5e7bf892df2031::t_0927207bb051e1 1-42
+src/services/serviceRecord.status.test.ts
+  s_5e7bf892df2031::t_e97bd540c9dddd 1-164
+src/controllers/report.controller.test.ts
+  s_5e7bf892df2031::t_913bf289f12d84 1-152
+src/services/tenant.service.update.test.ts
+  s_5e7bf892df2031::t_775b09f0b1da0f 1-49
+  s_5e7bf892df2031::t_0ae7d6722f441f 50-51
+src/controllers/audit.controller.test.ts
+  s_5e7bf892df2031::t_fe5a5c7d9491c5 1-116
+src/services/admin.service.test.ts
+  s_5e7bf892df2031::t_773f3e0dbaa18f 1-91
+src/services/auth.service.me.test.ts
+  s_5e7bf892df2031::t_7c0276b2dfb214 1-58
+src/services/serviceRecordTransitions.ts
+  s_5e7bf892df2031::t_5cda150c7af2d3 1-42
+src/utils/documentLink.ts
+  s_5e7bf892df2031::t_663f3fff3013d3 41
+  s_5e7bf892df2031::t_c91d4aa386f3d6 1-40,42-46
+src/middleware/authorization.middleware.test.ts
+  s_5e7bf892df2031::t_9155e5dfdd6127 2-33,35-39,41-44,46-50,80-81
+  s_5e7bf892df2031::t_9a62bbc98126cb 1,34,40,45,51-79
+src/controllers/admin.controller.test.ts
+  s_5e7bf892df2031::t_79729218ce5e1c 1-149
+src/services/document.service.test.ts
+  s_5e7bf892df2031::t_8cafeebdbde24f 1-167
+  s_5e7bf892df2031::t_670a3950ca0e64 168-171
+.github/workflows/git-ai.yaml
+  s_5e7bf892df2031::t_6966551eff0ae4 1-26
+package.json
+  s_5e7bf892df2031::t_079579dd53a0dc 26
+src/controllers/admin.controller.ts
+  s_5e7bf892df2031::t_08864ade600287 6-8,39,43-46,203-204,218-222,226-230,232-242,254-265,268-272,288,305-311
+src/controllers/audit.controller.ts
+  s_5e7bf892df2031::t_eb94f209a07a24 5-24,28-32,34-45,49-50,52,54-55,85-86,95-99,101-103,112-117
+src/controllers/document.controller.ts
+  s_5e7bf892df2031::t_02607b44b47ce7 5-7,15-17,24-71,73-75,84-92,106-119,195-201,234-235,257-258,280,288-305,308-318,320-354
+src/controllers/report.controller.ts
+  s_5e7bf892df2031::t_7431ee38a708e5 15-54,56-62,65-69,71-101,122,131-133,135,140-141,149,158-160,162,167-168,176,186,198-200,202,207-208,216,226,237,247,265-267,273-275,281-283,289-291,304-309,317,329,336,347,354
+src/controllers/serviceRecord.controller.ts
+  s_5e7bf892df2031::t_bcf5b762db297d 9-10,516-557,562-575,592-595
+src/dto/document.dto.ts
+  s_5e7bf892df2031::t_a90dd1d2f2d30c 53
+src/dto/tenant.dto.ts
+  s_5e7bf892df2031::t_ce122db2e36f70 25,79,126-129,140
+src/middleware/audit.middleware.ts
+  s_5e7bf892df2031::t_2cb823d92fe76a 191-194
+src/middleware/auth.middleware.ts
+  s_5e7bf892df2031::t_8be9c82420b911 4,52-56
+src/middleware/authorization.middleware.ts
+  s_5e7bf892df2031::t_4cfaf7f81f87a1 5,89-161
+src/models/AuditLog.ts
+  s_5e7bf892df2031::t_c112b2996225fd 8,20-23,42-45,72-73
+src/models/Document.ts
+  s_5e7bf892df2031::t_3e02f53be46057 226-235,268-271
+src/openapi/paths/document.openapi.ts
+  s_5e7bf892df2031::t_7a7812411d4314 13,82-108
+src/routes/document.routes.ts
+  s_5e7bf892df2031::t_8471d2e2c7d05d 4,24-32,35-49,92,107-114
+src/routes/invoice.routes.ts
+  s_5e7bf892df2031::t_070278e0e00640 5,36,61,70
+src/routes/report.routes.ts
+  s_5e7bf892df2031::t_13740acda644fd 18-28
+src/routes/serviceRecord.routes.ts
+  s_5e7bf892df2031::t_967ce7b836adea 10,60-68,112,122,132,149,193,211
+src/routes/subscription.routes.ts
+  s_5e7bf892df2031::t_cd6815d10cba6b 5,26,35
+src/routes/tenant.routes.ts
+  s_5e7bf892df2031::t_11538fff62b5c6 5,25
+src/scripts/drop-document-ttl-index.ts
+  s_5e7bf892df2031::t_d3a07cbf006cf0 1-39
+src/services/account.service.ts
+  s_5e7bf892df2031::t_84780f7b558b4d 30-33,48-49,54-61
+src/services/admin.service.ts
+  s_5e7bf892df2031::t_6cf28d11842687 24-48,133
+src/services/audit.service.ts
+  s_5e7bf892df2031::t_a4cfbe2ebb4b6d 7,35-36,63-65,148-149
+src/services/auth.service.ts
+  s_5e7bf892df2031::t_a6a6314bbb0c9b 7,460-474
+src/services/owner.service.ts
+  s_5e7bf892df2031::t_d133faa948c4bd 328,351-353
+src/services/report.service.ts
+  s_5e7bf892df2031::t_afe90a27b7807c 54
+src/services/serviceRecord.service.ts
+  s_5e7bf892df2031::t_5db839cf6577df 12,560-581,583,591,617-623,625-633,647-692,714
+src/services/tenant.service.ts
+  s_5e7bf892df2031::t_fa0db9b175f1b7 74,76-80,93-113,116-117,122-127,235-239
+src/utils/token.ts
+  s_5e7bf892df2031::t_9dea64283907e6 230-278
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "423949d8e5d191919ca65570dfe453f115dbc7b2",
+  "prompts": {},
+  "sessions": {
+    "s_5e7bf892df2031": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "fb5f65ae-fc51-4170-92ef-a4855b8c547a",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "Raghava9441 <raghavendrareddybollapu556@gmail.com>"
+    }
+  }
+}
