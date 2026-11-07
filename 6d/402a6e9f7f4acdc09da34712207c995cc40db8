@@ -1,0 +1,37 @@
+docs/voice-intake.md
+  s_91bd522ee95185::t_10b6ce7d5298e1 1-47
+src/app.ts
+  s_91bd522ee95185::t_dd6ea7f7eb7eb7 53,242
+src/dto/voice-intake.dto.ts
+  s_91bd522ee95185::t_5b6e552f76d1e3 1-64
+src/services/voiceIntake.service.ts
+  s_91bd522ee95185::t_216ffc99fda381 1-408
+src/routes/voiceIntake.routes.ts
+  s_91bd522ee95185::t_694972bb39eb37 1-35
+.env.example
+  s_91bd522ee95185::t_5b6e552f76d1e3 137-142
+src/config/schema.ts
+  s_91bd522ee95185::t_5b6e552f76d1e3 109-116
+src/services/voiceIntake.service.test.ts
+  s_91bd522ee95185::t_e85a990ee8aa35 1-193
+src/config/environment.ts
+  s_91bd522ee95185::t_5b6e552f76d1e3 85-90
+src/controllers/voiceIntake.controller.ts
+  s_91bd522ee95185::t_9f7ef144265163 1-43
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "6d402a6e9f7f4acdc09da34712207c995cc40db8",
+  "prompts": {},
+  "sessions": {
+    "s_91bd522ee95185": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b3f7d743-177d-454d-a743-faa2c03578e2",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "Raghava9441 <raghavendrareddybollapu556@gmail.com>"
+    }
+  }
+}
