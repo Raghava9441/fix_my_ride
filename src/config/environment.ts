@@ -82,6 +82,12 @@ export const config = {
     appSecret: env.WHATSAPP_APP_SECRET,
   },
 
+  voice: {
+    llmBaseUrl: env.VOICE_LLM_BASE_URL,
+    llmModel: env.VOICE_LLM_MODEL,
+    llmTimeoutMs: env.VOICE_LLM_TIMEOUT_MS,
+  },
+
   storage: {
     provider: env.STORAGE_PROVIDER,
     uploadDir: env.UPLOAD_DIR,

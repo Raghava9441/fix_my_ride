@@ -106,6 +106,14 @@ export const envSchema = z
     WHATSAPP_WEBHOOK_VERIFY_TOKEN: z.string().optional(),
     WHATSAPP_APP_SECRET: z.string().optional(),
 
+    // ─── Voice intake (local open-source LLM via Ollama) ────────────────
+    // Turns a spoken transcript into form fields. Free: runs on your own
+    // machine/server (https://ollama.com). If unreachable, the service falls
+    // back to a rule-based extractor, so intake still works with fewer fields.
+    VOICE_LLM_BASE_URL: z.string().url().default("http://localhost:11434"),
+    VOICE_LLM_MODEL: z.string().default("qwen2.5:3b"),
+    VOICE_LLM_TIMEOUT_MS: z.coerce.number().int().positive().default(20000),
+
     // ─── Storage ────────────────────────────────────────────────────────
     STORAGE_PROVIDER: z.enum(["local", "s3", "cloudinary"]).default("local"),
     UPLOAD_DIR: z.string().optional(),

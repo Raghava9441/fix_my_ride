@@ -50,6 +50,7 @@ import healthRoutes from "./routes/health.routes";
 import notificationRoutes from "./routes/notification.routes";
 import documentRoutes from "./routes/document.routes";
 import auditRoutes from "./routes/audit.routes";
+import voiceIntakeRoutes from "./routes/voiceIntake.routes";
 import docsRoutes from "./routes/docs.routes";
 
 // Import services
@@ -238,6 +239,7 @@ app.use("/api/v1/accounts", accountRoutes);
 app.use("/api/v1/notifications", notificationRoutes);
 app.use("/api/v1/documents", documentRoutes);
 app.use("/api/v1/audit-logs", auditRoutes);
+app.use("/api/v1/voice-intake", voiceIntakeRoutes);
 
 // ========================================
 // Static Files (for document uploads)
